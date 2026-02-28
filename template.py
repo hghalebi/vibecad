@@ -107,13 +107,18 @@ exporter.write(OUTPUT_FILENAME)
 """
 
 PROPOSAL_PROMPT = """You are an expert in python and build123d. 
-Look at the following build123d script. Propose a common code change task that a user might request.
-Stick to common tasks performed by coding models, such as:
-- **Refactoring**: Introducing variables/parameters, using loops, or extracting logic into functions.
-- **Feature Addition**: Adding new elements (holes, fillets, chamfers, labels, handles, mounting points).
-- **Design Variation**: Changing the topology or structure of the part.
-- **Optimization**: Improving code readability or structure.
-- **Parameter Tuning**: Modifying dimensions or counts.
+Look at the following build123d script. Propose a meaningful 3D CAD modeling task that a user might request.
+Focus on geometric changes and model structure. Do NOT propose pure refactoring or simple variable name changes.
+
+Tasks should involve clear geometric modifications, such as:
+- **Functional Feature Addition**: Adding practical features like mounting holes, simple brackets, reinforcement ribs, custom labels, or protective rims.
+- **Geometric Variation**: Modifying existing shapes (e.g., changing a sharp corner to a specific fillet/chamfer, adding a cutout pattern, or extending a part's reach).
+- **Component Integration**: Adding features to allow the part to interface with common hardware (e.g., a hex nut pocket, a countersunk screw hole, or a slot for a belt).
+- **Dimension Modification**: Adjusting the primary dimensions (length, width, height, or thickness) of the part's main body or specific components.
+- **Feature Patterning**: Repeating an existing feature (like a hole or a post) in a simple linear or polar array.
+- **Subtractive Geometry**: Adding a single, well-defined cutout or pocket (e.g., a circular hole, a rectangular slot) to a specific face.
+
+The task should require modifying or adding a few blocks of build123d code.
 
 Base Code:
 ```python
@@ -124,17 +129,15 @@ Output strictly in JSON format matching this schema:
 {{
   "user_prompt": "The natural language instruction",
   "explanation": "Brief technical explanation of the change",
-  "task_type": "one of: refactor, feature, design, optimization, parameter",
+  "task_type": "one of: feature_addition, geometric_variation, component_integration, dimension_modification, feature_patterning, subtractive_geometry",
   "edits": [
     {{
       "search": "exact string from base code to replace",
       "replace": "the new string to insert"
     }}
   ],
-  "new_code": "Alternatively, provide the ENTIRE new file code if multiple surgical edits are too complex"
-}}
-
-Note: Prefer 'edits' for small changes and 'new_code' for major structural changes."""
+  "new_code": "Provide the ENTIRE new file code here. This is preferred for ensuring structural integrity."
+}}"""
 
 FIX_PROMPT = """You are an expert in python and build123d. 
 You previously proposed a change that failed.

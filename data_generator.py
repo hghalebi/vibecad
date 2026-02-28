@@ -24,15 +24,12 @@ if not OPENROUTER_API_KEY:
 
 # Models to use
 CODING_MODEL = "anthropic/claude-sonnet-4.6"
-VLM_MODEL = "openai/gpt-4o"
-#CODING_MODEL = "qwen/qwen3-next-80b-a3b-instruct:free"
-#VLM_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
+VLM_MODEL = "anthropic/claude-sonnet-4.6"
 
-ITERATIONS = 10
+ITERATIONS = 50
 OUTPUT_FILE = "build123d_agent_dataset.jsonl"
 RUNS_DIR = "runs"
-# EXAMPLES can be a glob pattern or a list of specific files
-# EXAMPLES = "examples/build123d_examples/*.py"
+# Expanded list for more complex variety
 EXAMPLES = [
     "examples/build123d_examples/clock.py",
     "examples/build123d_examples/holes.py",
@@ -48,6 +45,18 @@ client = OpenAI(
 )
 
 from template import RENDER_TEMPLATE, PROPOSAL_PROMPT, FIX_PROMPT, VALIDATION_PROMPT
+
+# ==========================================
+# 2. Complexity Strategies
+# ==========================================
+COMPLEXITY_STRATEGIES = [
+    "Add functional features like mounting holes (e.g., for M3 screws), simple support brackets, or reinforcement ribs.",
+    "Introduce clear geometric modifications like adding a specific cutout pattern, transforming sharp edges into fillets or chamfers, or adding a recessed label/logo.",
+    "Add practical component interfaces like a hex nut pocket, a slot for a timing belt, or a countersunk hole.",
+    "Modify primary dimensions (e.g., length, width, or height) of the main body to change the part's overall size while keeping the topology intact.",
+    "Create a linear or polar array of an existing feature (like a hole, a post, or a boss) to repeat it across the part.",
+    "Add a single, well-defined subtractive feature (like a circular hole or a rectangular slot) on a specific face of the part."
+]
 
 # ==========================================
 # 3. Core Functions
@@ -92,13 +101,18 @@ def parse_json_response(content):
     return None
 
 def generate_proposal(base_code):
-    """Uses a coding LLM to propose an edit."""
+    """Uses a coding LLM to propose a complex edit."""
+    strategy = random.choice(COMPLEXITY_STRATEGIES)
     prompt = PROPOSAL_PROMPT.format(base_code=base_code)
+    prompt += f"\n\nIMPORTANT: For this task, focus on this complexity strategy: {strategy}"
 
     response = client.chat.completions.create(
         model=CODING_MODEL,
         response_format={"type": "json_object"},
-        messages=[{"role": "user", "content": prompt}]
+        messages=[
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You only propose complex, high-impact geometric modifications and avoid simple refactoring or parameter tweaks. You prefer providing full code via 'new_code' for any non-trivial structural changes."},
+            {"role": "user", "content": prompt}
+        ]
     )
 
     content = response.choices[0].message.content
@@ -172,7 +186,10 @@ def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message)
     response = client.chat.completions.create(
         model=CODING_MODEL,
         response_format={"type": "json_object"},
-        messages=[{"role": "user", "content": prompt}]
+        messages=[
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You provide robust, high-quality fixes for complex 3D modeling code. You prefer providing full code via 'new_code' to resolve structural or execution errors."},
+            {"role": "user", "content": prompt}
+        ]
     )
 
     content = response.choices[0].message.content
@@ -266,6 +283,7 @@ def main():
             # 2. Generate Proposal
             try:
                 proposal = generate_proposal(current_base_code)
+                proposal['input_code'] = current_base_code # Save the input code for reference
                 user_prompt = proposal.get('user_prompt')
                 task_type = proposal.get('task_type', 'unknown')
                 print(f"Prompt: {user_prompt} ({task_type})")
