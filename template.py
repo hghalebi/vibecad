@@ -13,6 +13,7 @@ with BuildPart() as ex3:
 
 RENDER_TEMPLATE = """
 import build123d as bd
+import math
 
 # Capture logic to find the object to render
 def _find_captured_obj():
@@ -57,10 +58,20 @@ views = {
 all_visible = []
 all_hidden = []
 all_labels = []
+grid_visible = []
 
 obj_bb = _captured_obj.bounding_box()
 obj_size = max(obj_bb.size.X, obj_bb.size.Y, obj_bb.size.Z)
 spacing = 1.5 * obj_size if obj_size > 0 else 150
+
+# Determine grid step
+if obj_size > 0:
+    grid_step = 10 ** math.floor(math.log10(obj_size / 5))
+    if obj_size / grid_step > 15: grid_step *= 5
+    elif obj_size / grid_step < 3: grid_step /= 2
+else:
+    grid_step = 10
+grid_count = 10
 
 # Add axes
 axes_size = obj_size * 0.2 if obj_size > 0 else 20
@@ -83,6 +94,22 @@ for i, (name, (origin, up)) in enumerate(views.items()):
     all_visible.extend([s.moved(translation) for s in visible])
     all_hidden.extend([s.moved(translation) for s in hidden])
     
+    # Project grid
+    g_lines = []
+    if name in [\"Top\", \"Isometric\"]:
+        g_lines = [bd.Edge.make_line((j*grid_step, -grid_count*grid_step, 0), (j*grid_step, grid_count*grid_step, 0)) for j in range(-grid_count, grid_count + 1)] + \\
+                  [bd.Edge.make_line((-grid_count*grid_step, j*grid_step, 0), (grid_count*grid_step, j*grid_step, 0)) for j in range(-grid_count, grid_count + 1)]
+    elif name == \"Front\":
+        g_lines = [bd.Edge.make_line((j*grid_step, 0, -grid_count*grid_step), (j*grid_step, 0, grid_count*grid_step)) for j in range(-grid_count, grid_count + 1)] + \\
+                  [bd.Edge.make_line((-grid_count*grid_step, 0, j*grid_step), (grid_count*grid_step, 0, j*grid_step)) for j in range(-grid_count, grid_count + 1)]
+    elif name == \"Right\":
+        g_lines = [bd.Edge.make_line((0, j*grid_step, -grid_count*grid_step), (0, j*grid_step, grid_count*grid_step)) for j in range(-grid_count, grid_count + 1)] + \\
+                  [bd.Edge.make_line((0, -grid_count*grid_step, j*grid_step), (0, grid_count*grid_step, j*grid_step)) for j in range(-grid_count, grid_count + 1)]
+    
+    if g_lines:
+        vg, _ = bd.Compound(children=g_lines).project_to_viewport(origin, viewport_up=up)
+        grid_visible.extend([s.moved(translation) for s in vg])
+
     # Project axes
     vx, _ = x_axis.project_to_viewport(origin, viewport_up=up)
     vy, _ = y_axis.project_to_viewport(origin, viewport_up=up)
@@ -114,14 +141,16 @@ combined = bd.Compound(children=all_visible + all_hidden + all_labels)
 max_dim = max(combined.bounding_box().size.X, combined.bounding_box().size.Y)
 if max_dim == 0: max_dim = 1
 
-exporter = bd.ExportSVG(scale=600/max_dim, line_weight=0.3)
-exporter.add_layer(\"Visible\", line_color=(0,0,0))
-exporter.add_layer(\"Hidden\", line_color=(150, 150, 150), line_type=bd.LineType.ISO_DOT)
-exporter.add_layer(\"X-Axis\", line_color=(255, 0, 0), line_weight=0.8)
-exporter.add_layer(\"Y-Axis\", line_color=(0, 255, 0), line_weight=0.8)
-exporter.add_layer(\"Z-Axis\", line_color=(0, 0, 255), line_weight=0.8)
-exporter.add_layer(\"Labels\", line_color=(50, 50, 50))
+exporter = bd.ExportSVG(scale=600/max_dim, line_weight=0.6)
+exporter.add_layer(\"Visible\", line_color=(0,0,0), line_weight=0.6)
+exporter.add_layer(\"Hidden\", line_color=(150, 150, 150), line_type=bd.LineType.ISO_DOT, line_weight=0.3)
+exporter.add_layer(\"Grid\", line_color=(220, 220, 220), line_weight=0.2)
+exporter.add_layer(\"X-Axis\", line_color=(255, 0, 0), line_weight=1.2)
+exporter.add_layer(\"Y-Axis\", line_color=(0, 255, 0), line_weight=1.2)
+exporter.add_layer(\"Z-Axis\", line_color=(0, 0, 255), line_weight=1.2)
+exporter.add_layer(\"Labels\", line_color=(50, 50, 50), line_weight=0.5)
 
+exporter.add_shape(grid_visible, layer=\"Grid\")
 exporter.add_shape(all_visible, layer=\"Visible\")
 exporter.add_shape(all_hidden, layer=\"Hidden\")
 exporter.add_shape(axes_visible[\"X\"], layer=\"X-Axis\")
@@ -136,6 +165,7 @@ PROPOSAL_PROMPT = """You are an expert in python and build123d.
 Look at the following build123d script and the provided render of the model. 
 Propose a clear and well-defined 3D CAD modeling task that a user might request.
 Focus on a single, reliable geometric change.
+The render includes a grid with units shown by the scale bar to help you determine dimensions.
 
 Tasks should involve clear, simple modifications, such as:
 - **Feature Addition**: Adding a single practical feature like a mounting hole, a small boss, or a recessed pocket.
@@ -166,6 +196,7 @@ Output strictly in JSON format matching this schema:
 
 FIX_PROMPT = """You are an expert in python and build123d. 
 You previously proposed a change that failed.
+The render includes a grid and axes (X=Red, Y=Green, Z=Blue) to help you debug placement.
 
 User Request: "{user_prompt}"
 Task Type: "{task_type}"
@@ -199,13 +230,13 @@ Output strictly in JSON format matching this schema:
 VALIDATION_PROMPT = """You are a strict CAD validation expert. 
 A CAD agent was tasked with: \"{user_prompt}\"
 
-Image 1: Original model (multiple views with coordinate axes: X=Red, Y=Green, Z=Blue).
-Image 2: Modified model.
+Image 1: Original model (multiple views with coordinate axes: X=Red, Y=Green, Z=Blue, and a light gray grid).
+Image 2: Modified model (same views and grid).
 
 Your goal is to verify if the modification is exactly as requested and if the rest of the model remains intact.
 1. Check if the new features are present and correctly positioned according to the prompt.
 2. Verify that NO unintended changes were made to the original geometry.
-3. Pay close attention to the scale bar to ensure dimensions are reasonable if specified.
+3. Use the grid and scale bar to ensure dimensions are correct if specified.
 4. Use the coordinate axes to verify the orientation and placement of changes.
 
 Be highly critical. If there are any discrepancies, missing features, or unintended distortions, you must conclude with FAIL.

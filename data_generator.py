@@ -23,10 +23,10 @@ if not OPENROUTER_API_KEY:
     print("Warning: OPENROUTER_API_KEY environment variable not set.")
 
 # Models to use
-#CODING_MODEL = "anthropic/claude-sonnet-4.6"
-#VLM_MODEL = "anthropic/claude-sonnet-4.6"
-CODING_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
-VLM_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
+CODING_MODEL = "anthropic/claude-sonnet-4.6"
+VLM_MODEL = "anthropic/claude-sonnet-4.6"
+# CODING_MODEL = "qwen/qwen3.5-35b-a3b"
+# VLM_MODEL = "qwen/qwen3.5-35b-a3b"
 
 ITERATIONS = 50
 OUTPUT_FILE = "build123d_agent_dataset.jsonl"
@@ -114,7 +114,7 @@ def generate_proposal(base_code, base_png):
         model=CODING_MODEL,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You propose clear, reliable, and well-defined geometric modifications. You prefer providing full code via 'new_code' to ensure the final script is complete and functional."},
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You propose clear, reliable, and well-defined geometric modifications. You prefer providing full code via 'new_code' to ensure the final script is complete and functional. The renders you receive include a grid and coordinate axes (X=Red, Y=Green, Z=Blue) to help you determine scale and placement."},
             {
                 "role": "user",
                 "content": [
@@ -197,7 +197,7 @@ def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message)
         model=CODING_MODEL,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You provide robust, high-quality fixes for 3D modeling code. You prefer providing full code via 'new_code' to ensure the final script is correct."},
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You provide robust, high-quality fixes for 3D modeling code. You prefer providing full code via 'new_code' to ensure the final script is correct. The renders include a grid and coordinate axes (X=Red, Y=Green, Z=Blue) to help you debug placement."},
             {"role": "user", "content": prompt}
         ]
     )
@@ -309,7 +309,7 @@ def main():
                 
             # 3. Apply Change & Execute (with retries)
             vlm_retry_count = 0
-            max_vlm_retries = 1
+            max_vlm_retries = 3
             
             # Extract initial edits/new_code
             current_edits = proposal.get('edits', [])
@@ -323,7 +323,7 @@ def main():
             success = False
             
             while vlm_retry_count <= max_vlm_retries:
-                max_retries = 3
+                max_retries = 5
                 current_try = 0
                 success = False
                 
@@ -337,6 +337,10 @@ def main():
                         error_msg = "No edits or new_code provided in proposal."
 
                     if not error_msg:
+                        if isinstance(new_code, dict):
+                            print(f"DEBUG: new_code is a dict! {new_code}")
+                            new_code = new_code.get('code', str(new_code))
+                        
                         with open(os.path.join(iter_dir, "generated_code.py"), "w") as f:
                             f.write(new_code)
                         
