@@ -69,7 +69,7 @@ def _render_to_png(obj, filename):
     # Prepare edges for wireframe
     edges_poly = mesh.extract_feature_edges(boundary_edges=True, feature_edges=True, manifold_edges=True)
 
-    plotter = pv.Plotter(off_screen=True, shape=(2, 2), window_size=(1200, 1200))
+    plotter = pv.Plotter(off_screen=True, shape=(2, 2), window_size=(800, 800))
     
     views = [
         ("Isometric", None),
@@ -113,20 +113,28 @@ def _render_to_png(obj, filename):
 _render_to_png(_captured_obj, OUTPUT_FILENAME)
 """
 
-PROPOSAL_PROMPT = """You are an expert in python and build123d. 
-Look at the following build123d script and the provided render of the model. 
-Propose a clear and well-defined 3D CAD modeling task that a user might request.
-Focus on a single, reliable geometric change.
-The render shows 4 views of the model (Isometric, Front, Top, Right). 
-Solid parts are shown in light blue with black CAD edges. A grid and coordinate axes (X=Red, Y=Green, Z=Blue) are provided for scale and orientation.
+PROPOSAL_PROMPT = """You are a world-class CAD engineer specializing in build123d.
+Your goal is to propose a clear, well-defined 3D modeling task and implement it.
 
-Tasks should involve clear, simple modifications, such as:
-- **Feature Addition**: Adding a single practical feature like a mounting hole, a small boss, or a recessed pocket.
-- **Geometric Variation**: Modifying an existing shape (e.g., adding a fillet or chamfer to an edge, or changing a single dimension).
-- **Subtractive Geometry**: Adding a single, well-defined cutout (e.g., a circular hole, a rectangular slot) to a specific face.
-- **Dimension Modification**: Adjusting a primary dimension (length, width, or height) of a component.
+### Step 1: Analysis
+Look at the following build123d script and the 4-view render.
+Identify the main body and its approximate dimensions.
+Determine the coordinate system: X=Red, Y=Green, Z=Blue.
 
-The task should be straightforward and require modifying or adding a few lines of build123d code.
+### Step 2: Planning
+Choose a strategy from this list: {strategy}
+Describe EXACTLY where the change will occur.
+Identify the target face/edge using ROBUST SELECTORS.
+**Do not use indices like `faces()[2]`!** Indices are fragile and likely to be wrong.
+Instead, use selectors like:
+- `faces().sort_by(Axis.Z)[-1]` (Top face)
+- `faces().sort_by(Axis.X)[0]` (Left face)
+- `faces().filter_by(GeomType.PLANE).sort_by(Axis.Y)[-1]` (Plane parallel to XZ, furthest in +Y)
+- `edges().sort_by(Axis.Z)[-1]` (Highest edges)
+
+### Step 3: Implementation
+Write the updated build123d code.
+Ensure you use the robust selectors you identified in the planning phase.
 
 Base Code:
 ```python
@@ -135,6 +143,8 @@ Base Code:
 
 Output strictly in JSON format matching this schema:
 {{
+  "analysis": "Brief analysis of the current geometry and coordinate system",
+  "plan": "Detailed description of the proposed change and the selectors to be used",
   "user_prompt": "The natural language instruction",
   "explanation": "Brief technical explanation of the change",
   "task_type": "one of: feature_addition, geometric_variation, dimension_modification, subtractive_geometry",
@@ -144,7 +154,7 @@ Output strictly in JSON format matching this schema:
       "replace": "the new string to insert"
     }}
   ],
-  "new_code": "Provide the ENTIRE new file code here. This is HIGHLY preferred."
+  "new_code": "Provide the ENTIRE new file code here. This is MANDATORY."
 }}"""
 
 FIX_PROMPT = """You are an expert in python and build123d. 

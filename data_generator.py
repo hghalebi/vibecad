@@ -5,6 +5,8 @@ import subprocess
 import datetime
 import random
 import glob
+from PIL import Image
+import io
 
 from openai import OpenAI
 
@@ -31,7 +33,7 @@ EXAMPLES = [
     "examples/build123d_examples/key_cap.py",
     "examples/build123d_examples/handle.py",
     "examples/build123d_examples/circuit_board.py",
-    "examples/build123d_examples/heat_exchanger.py",
+    #"examples/build123d_examples/heat_exchanger.py",
     #"examples/build123d_examples/joints.py",
     #"examples/build123d_examples/tea_cup.py",
 ]
@@ -52,7 +54,15 @@ COMPLEXITY_STRATEGIES = [
     "Add a single subtractive feature like a circular hole or a rectangular slot on a specific face.",
     "Modify one or two primary dimensions (e.g., length or width) to slightly change the part's size.",
     "Add a small boss, post, or recessed pocket to a main face.",
-    "Create a simple linear array of 2 or 3 holes across a flat surface."
+    "Create a simple linear array of 2 or 3 holes across a flat surface.",
+    "Apply a consistent fillet to all exterior vertical edges of the main body.",
+    "Add a 45-degree chamfer to the top-most circular edge of the part.",
+    "Create a circular pattern of 4 small holes (e.g., 2mm diameter) around the center of a circular face.",
+    "Add a counterbore to an existing hole to accommodate a socket head cap screw.",
+    "Hollow out the part (shell) from the bottom face with a constant wall thickness of 2mm.",
+    "Add a small 3D text label or a single character embossed on the largest flat surface.",
+    "Add a thin rib or support gusset between two perpendicular faces to increase stiffness.",
+    "Create a hexagonal cutout (e.g., for a nut pocket) on the bottom surface."
 ]
 
 # ==========================================
@@ -97,12 +107,37 @@ def parse_json_response(content):
 
     return None
 
+
+def get_geometry_metrics(code, base_dir=None):
+    """Executes code and extracts geometric properties using geometry_checker.py."""
+    with open("geometry_checker.py", "r") as f:
+        checker_logic = f.read()
+    
+    path_setup = "import sys\nimport os\nimport build123d as bd\n"
+    if base_dir:
+        path_setup += f"sys.path.append(os.path.abspath('{base_dir}'))\n"
+        
+    full_code = path_setup + code + "\n" + checker_logic
+    
+    with open("temp_metrics.py", "w") as f:
+        f.write(full_code)
+        
+    try:
+        result = subprocess.run(["python", "temp_metrics.py"], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            try:
+                return json.loads(result.stdout.strip())
+            except:
+                return {"error": f"Could not parse JSON: {result.stdout}"}
+        return {"error": result.stderr}
+    except Exception as e:
+        return {"error": str(e)}
+
 def generate_proposal(base_code, base_png):
     """Uses a coding LLM to propose a clear edit, using the base render for context."""
     strategy = random.choice(COMPLEXITY_STRATEGIES)
     print(f"  [Proposal] Using strategy: {strategy}")
-    prompt = PROPOSAL_PROMPT.format(base_code=base_code)
-    prompt += f"\n\nIMPORTANT: For this task, focus on this simple, well-defined strategy: {strategy}"
+    prompt = PROPOSAL_PROMPT.format(base_code=base_code, strategy=strategy)
 
     base64_base = encode_image(base_png)
 
@@ -111,12 +146,12 @@ def generate_proposal(base_code, base_png):
         model=CODING_MODEL,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You propose clear, reliable, and well-defined geometric modifications. You prefer providing full code via 'new_code' to ensure the final script is complete and functional. The renders you receive show 4 views (Isometric, Front, Top, Right) with a grid and coordinate axes (X=Red, Y=Green, Z=Blue) to help you determine scale and placement. Solid parts are shown in light blue with black CAD edges."},
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You follow a structured Analysis -> Planning -> Implementation workflow. You prioritize robust, coordinate-based selectors over index-based ones. The renders show 4 views (Isometric, Front, Top, Right) with a grid and axes (X=Red, Y=Green, Z=Blue) to help you determine scale and placement. Solid parts are shown in light blue with black CAD edges."},
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_base}"}}
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_base}"}}
                 ]
             }
         ]
@@ -184,30 +219,35 @@ def execute_and_render(code, svg_filename, png_filename, base_dir=None, runner_p
         print(f"  [Render] Error: {e}")
         return False, str(e)
 
-def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message, failed_code=None, base_png=None, new_png=None):
-    """Uses a coding LLM to fix a failed edit."""
+
+def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message, failed_code=None, base_png=None, new_png=None, metrics_diff=None):
+    """Uses a coding LLM to fix a failed edit with optional geometric feedback."""
     print(f"  [Fix] Calling {CODING_MODEL} to fix error...")
     
     failed_code_str = failed_code if failed_code else "No code provided."
     
+    feedback = error_message
+    if metrics_diff:
+        feedback += f"\n\nGeometric Property Changes Detected:\n{json.dumps(metrics_diff, indent=2)}"
+
     prompt = FIX_PROMPT.format(
         user_prompt=user_prompt,
         task_type=task_type,
         base_code=base_code,
         failed_code=failed_code_str,
         failed_edits=json.dumps(failed_edits, indent=2),
-        error_message=error_message
+        error_message=feedback
     )
 
     content_list = [{"type": "text", "text": prompt}]
     
     if base_png:
         base64_base = encode_image(base_png)
-        content_list.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_base}"}})
+        content_list.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_base}"}})
     
     if new_png and os.path.exists(new_png):
         base64_new = encode_image(new_png)
-        content_list.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_new}"}})
+        content_list.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_new}"}})
 
     response = client.chat.completions.create(
         model=CODING_MODEL,
@@ -229,10 +269,19 @@ def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message,
     return parsed
 
 
-def encode_image(image_path):
-    """Encodes an image to base64 for the VLM API."""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def encode_image(image_path, max_size=(640, 640)):
+    """Resizes an image and encodes it to base64 JPEG."""
+    with Image.open(image_path) as img:
+        # Resize if larger than max_size
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        # Convert to RGB (in case of RGBA) and save as JPEG to buffer
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+            
+        buffered = io.BytesIO()
+        img.save(buffered, format="JPEG", quality=85)
+        return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 def validate_with_vlm(user_prompt, base_png, new_png):
     """Uses a VLM to compare the original and new renders."""
@@ -249,8 +298,8 @@ def validate_with_vlm(user_prompt, base_png, new_png):
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_base}"}},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_new}"}}
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_base}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_new}"}}
                 ]
             }
         ]
@@ -298,11 +347,14 @@ def main():
             with open(base_file, "r") as f:
                 current_base_code = f.read()
 
+
             # Render the base model for this iteration
             base_png = os.path.join(iter_dir, "base.png")
             base_runner = os.path.join(iter_dir, "base_runner.py")
-            print("  [Step 1] Rendering base model...")
+            print("  [Step 1] Rendering base model and gathering metrics...")
             success, err = execute_and_render(current_base_code, None, base_png, base_dir=base_dir, runner_path=base_runner)
+            base_metrics = get_geometry_metrics(current_base_code, base_dir=base_dir)
+            
             if not success:
                 print(f"  [Error] Failed to render base: {err}. Skipping.")
                 with open(os.path.join(iter_dir, "error.txt"), "w") as f:
@@ -413,7 +465,18 @@ def main():
                     print(f"  [VLM Feedback] VLM failed validation. Attempting fix based on feedback...")
                     vlm_retry_count += 1
                     try:
-                        fix_proposal = generate_fix(current_base_code, user_prompt, task_type, current_edits, vlm_output, failed_code=new_code, base_png=base_png, new_png=new_png)
+                        # Extract metrics for the failed new code to provide feedback
+                        new_metrics = get_geometry_metrics(new_code, base_dir=base_dir)
+                        metrics_diff = None
+                        if base_metrics and new_metrics and "error" not in base_metrics and "error" not in new_metrics:
+                            metrics_diff = {
+                                "volume_change": new_metrics["volume"] - base_metrics["volume"],
+                                "num_faces_change": new_metrics["num_faces"] - base_metrics["num_faces"],
+                                "bbox_min_diff": [new_metrics["bbox_min"][i] - base_metrics["bbox_min"][i] for i in range(3)],
+                                "bbox_max_diff": [new_metrics["bbox_max"][i] - base_metrics["bbox_max"][i] for i in range(3)],
+                            }
+
+                        fix_proposal = generate_fix(current_base_code, user_prompt, task_type, current_edits, vlm_output, failed_code=new_code, base_png=base_png, new_png=new_png, metrics_diff=metrics_diff)
                         current_edits = fix_proposal.get('edits', [])
                         current_new_code = fix_proposal.get('new_code')
                     except Exception as e:
