@@ -160,7 +160,7 @@ def execute_and_render(code, svg_filename, png_filename, base_dir=None, runner_p
         # Convert SVG to PNG for the VLM
         if not os.path.exists(svg_filename):
             return False, "SVG was not generated."
-        cairosvg.svg2png(url=svg_filename, write_to=png_filename)
+        cairosvg.svg2png(url=svg_filename, write_to=png_filename, background_color="white")
         return True, None
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.decode('utf-8')

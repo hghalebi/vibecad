@@ -16,12 +16,8 @@ import build123d as bd
 
 # Capture logic to find the object to render
 def _find_captured_obj():
-    # If show() or show_object() was mocked, we might have it.
-    # But since we appended this, they already ran.
-    # We can inspect globals for common builder names or types.
     builders = []
     others = []
-    # We use list(globals().items()) to avoid "dictionary changed size during iteration"
     for name, obj in list(globals().items()):
         if name.startswith("_"): continue
         if isinstance(obj, (bd.BuildPart, bd.BuildSketch, bd.BuildLine)):
@@ -30,28 +26,18 @@ def _find_captured_obj():
             others.append(obj)
 
     if builders:
-        # Priority 1: BuildPart
         parts = [b for b in builders if isinstance(b, bd.BuildPart)]
         if parts: return parts[-1].part
-        
-        # Priority 2: BuildSketch
         sketches = [b for b in builders if isinstance(b, bd.BuildSketch)]
         if sketches: return sketches[-1].sketch
-        
-        # Priority 3: BuildLine
         lines = [b for b in builders if isinstance(b, bd.BuildLine)]
         if lines: return lines[-1].line
 
     if others:
-        # Priority 1: Part/Solid/Compound
         parts = [o for o in others if isinstance(o, (bd.Part, bd.Solid, bd.Compound))]
         if parts: return parts[-1]
-        
-        # Priority 2: Sketch/Face
         sketches = [o for o in others if isinstance(o, (bd.Sketch, bd.Face))]
         if sketches: return sketches[-1]
-        
-        # Priority 3: Curve/Wire/Edge
         return others[-1]
 
     return None
@@ -70,39 +56,79 @@ views = {
 
 all_visible = []
 all_hidden = []
-# Calculate spacing based on object size
+all_labels = []
+
 obj_bb = _captured_obj.bounding_box()
 obj_size = max(obj_bb.size.X, obj_bb.size.Y, obj_bb.size.Z)
 spacing = 1.5 * obj_size if obj_size > 0 else 150
 
+# Add axes
+axes_size = obj_size * 0.2 if obj_size > 0 else 20
+x_axis = bd.Edge.make_line((0,0,0), (axes_size, 0, 0))
+y_axis = bd.Edge.make_line((0,0,0), (0, axes_size, 0))
+z_axis = bd.Edge.make_line((0,0,0), (0, 0, axes_size))
+axes_visible = {\"X\": [], \"Y\": [], \"Z\": []}
+
 for i, (name, (origin, up)) in enumerate(views.items()):
     try:
         visible, hidden = _captured_obj.project_to_viewport(origin, viewport_up=up)
-    except AttributeError:
-        # If it's a sketch or curve, it might not have project_to_viewport
-        # Wrap it in a Compound if needed or handle accordingly
+    except:
         temp_comp = bd.Compound(children=[_captured_obj])
         visible, hidden = temp_comp.project_to_viewport(origin, viewport_up=up)
 
     col = i % 2
     row = i // 2
     translation = bd.Pos(col * spacing, -row * spacing)
-    visible_moved = [s.moved(translation) for s in visible]
-    hidden_moved = [s.moved(translation) for s in hidden]
-    all_visible.extend(visible_moved)
-    all_hidden.extend(hidden_moved)
+    
+    all_visible.extend([s.moved(translation) for s in visible])
+    all_hidden.extend([s.moved(translation) for s in hidden])
+    
+    # Project axes
+    vx, _ = x_axis.project_to_viewport(origin, viewport_up=up)
+    vy, _ = y_axis.project_to_viewport(origin, viewport_up=up)
+    vz, _ = z_axis.project_to_viewport(origin, viewport_up=up)
+    axes_visible[\"X\"].extend([s.moved(translation) for s in vx])
+    axes_visible[\"Y\"].extend([s.moved(translation) for s in vy])
+    axes_visible[\"Z\"].extend([s.moved(translation) for s in vz])
 
-combined = bd.Compound(children=all_visible + all_hidden)
-max_dimension = max(combined.bounding_box().size.X, combined.bounding_box().size.Y)
-if max_dimension == 0: max_dimension = 1
-exporter = bd.ExportSVG(scale=200 / max_dimension, line_weight=0.3)
-exporter.add_layer(\"Visible\")
+    # Add label
+    with bd.BuildSketch() as label_sk:
+        bd.Text(name, font_size=spacing*0.06)
+    label_moved = label_sk.sketch.moved(translation * bd.Pos(0, -spacing*0.45))
+    all_labels.append(label_moved)
 
-exporter.add_layer(\"Hidden\", line_color=(99, 99, 99), line_type=bd.LineType.ISO_DOT)
+# Add scale bar
+scale_bar_len = 10
+if obj_size > 100: scale_bar_len = 50
+elif obj_size > 500: scale_bar_len = 100
+elif obj_size < 5: scale_bar_len = 1
+
+with bd.BuildSketch() as scale_sk:
+    bd.Rectangle(scale_bar_len, spacing*0.01)
+    with bd.BuildSketch(bd.Location((0, spacing*0.04))) as scale_text:
+        bd.Text(f\"{scale_bar_len} units\", font_size=spacing*0.04)
+scale_bar_moved = scale_sk.sketch.moved(bd.Pos(spacing*0.5, -spacing*1.8))
+all_labels.append(scale_bar_moved)
+
+combined = bd.Compound(children=all_visible + all_hidden + all_labels)
+max_dim = max(combined.bounding_box().size.X, combined.bounding_box().size.Y)
+if max_dim == 0: max_dim = 1
+
+exporter = bd.ExportSVG(scale=600/max_dim, line_weight=0.3)
+exporter.add_layer(\"Visible\", line_color=(0,0,0))
+exporter.add_layer(\"Hidden\", line_color=(150, 150, 150), line_type=bd.LineType.ISO_DOT)
+exporter.add_layer(\"X-Axis\", line_color=(255, 0, 0), line_weight=0.8)
+exporter.add_layer(\"Y-Axis\", line_color=(0, 255, 0), line_weight=0.8)
+exporter.add_layer(\"Z-Axis\", line_color=(0, 0, 255), line_weight=0.8)
+exporter.add_layer(\"Labels\", line_color=(50, 50, 50))
+
 exporter.add_shape(all_visible, layer=\"Visible\")
 exporter.add_shape(all_hidden, layer=\"Hidden\")
+exporter.add_shape(axes_visible[\"X\"], layer=\"X-Axis\")
+exporter.add_shape(axes_visible[\"Y\"], layer=\"Y-Axis\")
+exporter.add_shape(axes_visible[\"Z\"], layer=\"Z-Axis\")
+exporter.add_shape(all_labels, layer=\"Labels\")
 
-# The string 'OUTPUT_FILENAME' will be dynamically replaced by our script
 exporter.write(OUTPUT_FILENAME)
 """
 
@@ -171,9 +197,18 @@ Output strictly in JSON format matching this schema:
   "new_code": "Alternatively, provide the ENTIRE new file code"
 }}"""
 
-VALIDATION_PROMPT = """You are a CAD validation agent. 
-The user asked a CAD agent to make the following change to a 3D model: \"{user_prompt}\"
-Image 1 is the original 2D projection. Image 2 is the new 2D projection.
+VALIDATION_PROMPT = """You are a strict CAD validation expert. 
+A CAD agent was tasked with: \"{user_prompt}\"
 
-Analyze both images and determine if the agent successfully made the requested change without destroying the rest of the model.
-Provide your reasoning first, and then conclude with EXACTLY the word "SUCCESS" or "FAIL" on a new line."""
+Image 1: Original model (multiple views with coordinate axes: X=Red, Y=Green, Z=Blue).
+Image 2: Modified model.
+
+Your goal is to verify if the modification is exactly as requested and if the rest of the model remains intact.
+1. Check if the new features are present and correctly positioned according to the prompt.
+2. Verify that NO unintended changes were made to the original geometry.
+3. Pay close attention to the scale bar to ensure dimensions are reasonable if specified.
+4. Use the coordinate axes to verify the orientation and placement of changes.
+
+Be highly critical. If there are any discrepancies, missing features, or unintended distortions, you must conclude with FAIL.
+Provide a detailed step-by-step analysis of the changes you observe.
+Conclude with EXACTLY the word "SUCCESS" or "FAIL" on a new line."""
