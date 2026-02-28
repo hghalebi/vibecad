@@ -22,9 +22,14 @@ def clean_json_string(text):
 # ==========================================
 # 1. Configuration
 # ==========================================
+SEED = int(os.environ.get("SEED", random.randint(0, 1000000)))
+random.seed(SEED)
+np.random.seed(SEED)
+print(f"Using random seed: {SEED}")
+
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "your_openrouter_api_key_here")
 MODEL = "nvidia/nemotron-3-nano-30b-a3b:free"
-NUM_SAMPLES = 500 # How many training pairs to generate
+NUM_SAMPLES = 10000 # How many training pairs to generate
 
 # ==========================================
 # 2. AST Mechanical Model Generation
@@ -430,8 +435,9 @@ def evaluate_topology(code_str, output_prefix=None):
             return None # Invalid geometry
             
         if output_prefix:
-            os.makedirs("output_renders", exist_ok=True)
-            render_to_png(part, f"output_renders/{output_prefix}.png")
+            render_dir = f"output_renders_{SEED}"
+            os.makedirs(render_dir, exist_ok=True)
+            render_to_png(part, f"{render_dir}/{output_prefix}.png")
             
         bbox = part.bounding_box().size
         return {
@@ -464,7 +470,7 @@ def main():
     if OPENROUTER_API_KEY == "your_openrouter_api_key_here":
         print("WARNING: OpenRouter API key not set. LLM generation will fail.")
         
-    output_file = "build123d_cot_dataset.jsonl"
+    output_file = f"build123d_cot_dataset_{SEED}.jsonl"
     attempts = 0
     successes = 0
     
@@ -517,7 +523,7 @@ def main():
                             "content": f"{llm_output['cot_reasoning']}\n\nHere is the updated code:\n```python\n{code_mod}\n```"
                         }
                     ],
-                    "images": [f"output_renders/{prefix}_before.png", f"output_renders/{prefix}_after.png"]
+                    "images": [f"output_renders_{SEED}/{prefix}_before.png", f"output_renders_{SEED}/{prefix}_after.png"]
                 }
                 f.write(json.dumps(training_example) + "\n")
                 f.flush()
