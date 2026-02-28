@@ -23,10 +23,10 @@ if not OPENROUTER_API_KEY:
     print("Warning: OPENROUTER_API_KEY environment variable not set.")
 
 # Models to use
-CODING_MODEL = "anthropic/claude-sonnet-4.6"
-VLM_MODEL = "anthropic/claude-sonnet-4.6"
-# CODING_MODEL = "qwen/qwen3.5-35b-a3b"
-# VLM_MODEL = "qwen/qwen3.5-35b-a3b"
+#CODING_MODEL = "anthropic/claude-sonnet-4.6"
+#VLM_MODEL = "anthropic/claude-sonnet-4.6"
+CODING_MODEL = "x-ai/grok-4.1-fast"
+VLM_MODEL = "x-ai/grok-4.1-fast"
 
 ITERATIONS = 50
 OUTPUT_FILE = "build123d_agent_dataset.jsonl"
@@ -39,6 +39,9 @@ EXAMPLES = [
     "examples/build123d_examples/lego.py",
     "examples/build123d_examples/key_cap.py",
     "examples/build123d_examples/handle.py",
+    "examples/build123d_examples/joints.py",
+    "examples/build123d_examples/boxes_on_faces.py",
+    "examples/build123d_examples/tea_cup.py",
 ]
 
 client = OpenAI(

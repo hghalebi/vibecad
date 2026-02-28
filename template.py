@@ -62,7 +62,7 @@ grid_visible = []
 
 obj_bb = _captured_obj.bounding_box()
 obj_size = max(obj_bb.size.X, obj_bb.size.Y, obj_bb.size.Z)
-spacing = 1.5 * obj_size if obj_size > 0 else 150
+spacing = 1.2 * obj_size if obj_size > 0 else 150
 
 # Determine grid step
 if obj_size > 0:
@@ -71,10 +71,10 @@ if obj_size > 0:
     elif obj_size / grid_step < 3: grid_step /= 2
 else:
     grid_step = 10
-grid_count = 10
+grid_count = 6
 
 # Add axes
-axes_size = obj_size * 0.2 if obj_size > 0 else 20
+axes_size = obj_size * 0.15 if obj_size > 0 else 20
 x_axis = bd.Edge.make_line((0,0,0), (axes_size, 0, 0))
 y_axis = bd.Edge.make_line((0,0,0), (0, axes_size, 0))
 z_axis = bd.Edge.make_line((0,0,0), (0, 0, axes_size))
@@ -120,8 +120,8 @@ for i, (name, (origin, up)) in enumerate(views.items()):
 
     # Add label
     with bd.BuildSketch() as label_sk:
-        bd.Text(name, font_size=spacing*0.06)
-    label_moved = label_sk.sketch.moved(translation * bd.Pos(0, -spacing*0.45))
+        bd.Text(name, font_size=spacing*0.05)
+    label_moved = label_sk.sketch.moved(translation * bd.Pos(0, -spacing*0.48))
     all_labels.append(label_moved)
 
 # Add scale bar
@@ -132,12 +132,12 @@ elif obj_size < 5: scale_bar_len = 1
 
 with bd.BuildSketch() as scale_sk:
     bd.Rectangle(scale_bar_len, spacing*0.01)
-    with bd.BuildSketch(bd.Location((0, spacing*0.04))) as scale_text:
-        bd.Text(f\"{scale_bar_len} units\", font_size=spacing*0.04)
-scale_bar_moved = scale_sk.sketch.moved(bd.Pos(spacing*0.5, -spacing*1.8))
+    with bd.BuildSketch(bd.Location((0, spacing*0.03))) as scale_text:
+        bd.Text(f\"{scale_bar_len} units\", font_size=spacing*0.03)
+scale_bar_moved = scale_sk.sketch.moved(bd.Pos(spacing*0.5, -spacing*1.55))
 all_labels.append(scale_bar_moved)
 
-combined = bd.Compound(children=all_visible + all_hidden + all_labels)
+combined = bd.Compound(children=all_visible + all_hidden + all_labels + grid_visible)
 max_dim = max(combined.bounding_box().size.X, combined.bounding_box().size.Y)
 if max_dim == 0: max_dim = 1
 
