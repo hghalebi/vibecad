@@ -100,18 +100,26 @@ def parse_json_response(content):
 
     return None
 
-def generate_proposal(base_code):
-    """Uses a coding LLM to propose a complex edit."""
+def generate_proposal(base_code, base_png):
+    """Uses a coding LLM to propose a complex edit, using the base render for context."""
     strategy = random.choice(COMPLEXITY_STRATEGIES)
     prompt = PROPOSAL_PROMPT.format(base_code=base_code)
     prompt += f"\n\nIMPORTANT: For this task, focus on this complexity strategy: {strategy}"
+
+    base64_base = encode_image(base_png)
 
     response = client.chat.completions.create(
         model=CODING_MODEL,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You only propose complex, high-impact geometric modifications and avoid simple refactoring or parameter tweaks. You prefer providing full code via 'new_code' for any non-trivial structural changes."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_base}"}}
+                ]
+            }
         ]
     )
 
@@ -282,7 +290,7 @@ def main():
 
             # 2. Generate Proposal
             try:
-                proposal = generate_proposal(current_base_code)
+                proposal = generate_proposal(current_base_code, base_png)
                 proposal['input_code'] = current_base_code # Save the input code for reference
                 user_prompt = proposal.get('user_prompt')
                 task_type = proposal.get('task_type', 'unknown')

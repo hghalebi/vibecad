@@ -133,7 +133,8 @@ exporter.write(OUTPUT_FILENAME)
 """
 
 PROPOSAL_PROMPT = """You are an expert in python and build123d. 
-Look at the following build123d script. Propose a meaningful 3D CAD modeling task that a user might request.
+Look at the following build123d script and the provided render of the model. 
+Propose a meaningful 3D CAD modeling task that a user might request.
 Focus on geometric changes and model structure. Do NOT propose pure refactoring or simple variable name changes.
 
 Tasks should involve clear geometric modifications, such as:
