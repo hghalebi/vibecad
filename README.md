@@ -1,1 +1,2 @@
 # vibecad
+ViveCAD is bridging the gap between generative AI and physical engineering. We are a team of deep-tech innovators fine-tuning open-source LLMs to translate natural language directly into precise, parametric industrial designs. By leveraging the reasoning capabilities of the Mistral architecture, ViveCAD democratizes complex CAD workflows, allowing engineers, product developers, and creators to iterate on physical models at the speed of thought. We aren't just generating images; we are generating manufacturable realities.
