@@ -19,23 +19,42 @@ def _find_captured_obj():
     # If show() or show_object() was mocked, we might have it.
     # But since we appended this, they already ran.
     # We can inspect globals for common builder names or types.
-    best_guess = None
     builders = []
+    others = []
     # We use list(globals().items()) to avoid "dictionary changed size during iteration"
     for name, obj in list(globals().items()):
+        if name.startswith("_"): continue
         if isinstance(obj, (bd.BuildPart, bd.BuildSketch, bd.BuildLine)):
             builders.append(obj)
         elif isinstance(obj, (bd.Part, bd.Sketch, bd.Curve, bd.Compound, bd.Solid, bd.Face, bd.Wire, bd.Edge)):
-            best_guess = obj
+            others.append(obj)
 
     if builders:
-        # Return the last builder found as it's usually the final object
-        obj = builders[-1]
-        if isinstance(obj, bd.BuildPart): return obj.part
-        if isinstance(obj, bd.BuildSketch): return obj.sketch
-        if isinstance(obj, bd.BuildLine): return obj.line
+        # Priority 1: BuildPart
+        parts = [b for b in builders if isinstance(b, bd.BuildPart)]
+        if parts: return parts[-1].part
+        
+        # Priority 2: BuildSketch
+        sketches = [b for b in builders if isinstance(b, bd.BuildSketch)]
+        if sketches: return sketches[-1].sketch
+        
+        # Priority 3: BuildLine
+        lines = [b for b in builders if isinstance(b, bd.BuildLine)]
+        if lines: return lines[-1].line
 
-    return best_guess
+    if others:
+        # Priority 1: Part/Solid/Compound
+        parts = [o for o in others if isinstance(o, (bd.Part, bd.Solid, bd.Compound))]
+        if parts: return parts[-1]
+        
+        # Priority 2: Sketch/Face
+        sketches = [o for o in others if isinstance(o, (bd.Sketch, bd.Face))]
+        if sketches: return sketches[-1]
+        
+        # Priority 3: Curve/Wire/Edge
+        return others[-1]
+
+    return None
 
 _captured_obj = _find_captured_obj()
 
