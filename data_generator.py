@@ -3,6 +3,8 @@ import json
 import base64
 import subprocess
 import datetime
+import random
+import glob
 
 try:
     import cairosvg
@@ -29,13 +31,22 @@ VLM_MODEL = "openai/gpt-4o"
 ITERATIONS = 10
 OUTPUT_FILE = "build123d_agent_dataset.jsonl"
 RUNS_DIR = "runs"
+# EXAMPLES can be a glob pattern or a list of specific files
+# EXAMPLES = "examples/build123d_examples/*.py"
+EXAMPLES = [
+    "examples/build123d_examples/clock.py",
+    "examples/build123d_examples/holes.py",
+    "examples/build123d_examples/loft.py",
+    "examples/build123d_examples/lego.py",
+    "examples/build123d_examples/key_cap.py",
+]
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=OPENROUTER_API_KEY,
 )
 
-from template import BASE_CODE, RENDER_TEMPLATE, PROPOSAL_PROMPT, FIX_PROMPT, VALIDATION_PROMPT
+from template import RENDER_TEMPLATE, PROPOSAL_PROMPT, FIX_PROMPT, VALIDATION_PROMPT
 
 # ==========================================
 # 3. Core Functions
@@ -52,10 +63,16 @@ def generate_proposal(base_code):
     
     return json.loads(response.choices[0].message.content)
 
-def execute_and_render(code, svg_filename, png_filename):
-    #Executes the code safely and converts the resulting SVG to PNG. Returns (success, error_msg)
+def execute_and_render(code, svg_filename, png_filename, base_dir=None):
+    """Executes the code safely and converts the resulting SVG to PNG. Returns (success, error_msg)"""
+    
+    # Prepend path setup if base_dir is provided to handle local imports
+    path_setup = ""
+    if base_dir:
+        path_setup = f"import sys\nimport os\nsys.path.append(os.path.abspath('{base_dir}'))\n"
+
     # Combine user code with the rendering template
-    full_code = code + RENDER_TEMPLATE
+    full_code = path_setup + code + "\n" + RENDER_TEMPLATE
     
     # Inject the specific output filename
     executable_code = full_code.replace("OUTPUT_FILENAME", f'"{svg_filename}"')
@@ -65,8 +82,12 @@ def execute_and_render(code, svg_filename, png_filename):
         
     try:
         # Run in a subprocess with a timeout
-        subprocess.run(["python", "temp_runner.py"], check=True, timeout=10, capture_output=True)
+        # Using -c to avoid issues with current directory if needed, 
+        # but here we just run the file.
+        result = subprocess.run(["python", "temp_runner.py"], check=True, timeout=20, capture_output=True)
         # Convert SVG to PNG for the VLM
+        if not os.path.exists(svg_filename):
+            return False, "SVG was not generated."
         cairosvg.svg2png(url=svg_filename, write_to=png_filename)
         return True, None
     except subprocess.CalledProcessError as e:
@@ -81,7 +102,7 @@ def execute_and_render(code, svg_filename, png_filename):
         return False, str(e)
 
 def generate_fix(base_code, user_prompt, failed_search, failed_replace, error_message):
-    #Uses a coding LLM to fix a failed edit.
+    """Uses a coding LLM to fix a failed edit."""
     prompt = FIX_PROMPT.format(
         user_prompt=user_prompt,
         base_code=base_code,
@@ -125,7 +146,7 @@ def validate_with_vlm(user_prompt, base_png, new_png):
     )
     
     raw_content = response.choices[0].message.content.strip()
-    return "YES" in raw_content.upper(), raw_content
+    return "SUCCESS" in raw_content.upper(), raw_content
 
 # ==========================================
 # 4. Main Loop
@@ -141,102 +162,126 @@ def main():
     os.makedirs(run_dir, exist_ok=True)
     print(f"Starting run: {run_dir}")
 
-    base_svg = os.path.join(run_dir, "base.svg")
-    base_png = os.path.join(run_dir, "base.png")
-
-    print("Generating base model render...")
-    success, err = execute_and_render(BASE_CODE, base_svg, base_png)
-    if not success:
-        print(f"Failed to render the base code: {err}")
+    # Find all example files
+    if isinstance(EXAMPLES, list):
+        example_files = EXAMPLES
+    else:
+        example_files = glob.glob(EXAMPLES)
+        
+    if not example_files:
+        print(f"No example files found for {EXAMPLES}")
         return
     
     success_count = 0
+    global_iter = 0
     
     with open(OUTPUT_FILE, "a") as dataset_file:
-        for i in range(ITERATIONS):
-            iter_num = i + 1
-            iter_dir = os.path.join(run_dir, f"iter_{iter_num:03d}")
-            os.makedirs(iter_dir, exist_ok=True)
-            
-            print(f"\n--- Iteration {iter_num}/{ITERATIONS} ---")
-            
-            # 1. Generate Proposal
-            try:
-                proposal = generate_proposal(BASE_CODE)
-                user_prompt = proposal.get('user_prompt')
-                search_block = proposal.get('search')
-                replace_block = proposal.get('replace')
-                print(f"Prompt: {user_prompt}")
+        for base_file in example_files:
+            base_dir = os.path.dirname(base_file)
+            for i in range(ITERATIONS):
+                global_iter += 1
+                iter_num = global_iter
+                iter_dir = os.path.join(run_dir, f"iter_{iter_num:03d}")
+                os.makedirs(iter_dir, exist_ok=True)
                 
-                # Save initial proposal
-                with open(os.path.join(iter_dir, "proposal.json"), "w") as f:
-                    json.dump(proposal, f, indent=2)
-            except Exception as e:
-                print(f"Failed to generate valid JSON proposal: {e}. Skipping.")
-                continue
+                print(f"\n--- Iteration {iter_num} (File: {base_file}) ---")
                 
-            # 2. Apply Diff & Execute (with retries)
-            max_retries = 3
-            current_try = 0
-            success = False
-            current_search = search_block
-            current_replace = replace_block
-            new_code = ""
-            
-            while current_try < max_retries:
-                if not current_search or current_search not in BASE_CODE:
-                    error_msg = f"Search block not found in base code."
-                    print(error_msg)
-                else:
-                    new_code = BASE_CODE.replace(current_search, current_replace)
-                    with open(os.path.join(iter_dir, "code.py"), "w") as f:
-                        f.write(new_code)
-                    
-                    new_svg = os.path.join(iter_dir, "new.svg")
-                    new_png = os.path.join(iter_dir, "new.png")
-                    success, error_msg = execute_and_render(new_code, new_svg, new_png)
-                
-                if success:
-                    # Update search/replace to the ones that actually worked
-                    search_block, replace_block = current_search, current_replace
-                    break
-                
-                with open(os.path.join(iter_dir, "error.txt"), "a") as f:
-                    f.write(f"\n[Try {current_try+1}] {error_msg}")
+                with open(base_file, "r") as f:
+                    current_base_code = f.read()
 
-                current_try += 1
-                if current_try < max_retries:
-                    print(f"Retry {current_try}/{max_retries} due to error...")
-                    try:
-                        fix_proposal = generate_fix(BASE_CODE, user_prompt, current_search, current_replace, error_msg)
-                        current_search = fix_proposal.get('search')
-                        current_replace = fix_proposal.get('replace')
-                    except Exception as e:
-                        print(f"Failed to generate fix: {e}")
+                # Render the base model for this iteration
+                base_svg = os.path.join(iter_dir, "base.svg")
+                base_png = os.path.join(iter_dir, "base.png")
+                print("Generating base model render...")
+                success, err = execute_and_render(current_base_code, base_svg, base_png, base_dir=base_dir)
+                if not success:
+                    print(f"Failed to render the base code: {err}. Skipping iteration.")
+                    with open(os.path.join(iter_dir, "error.txt"), "w") as f:
+                        f.write(f"Base render error: {err}")
+                    continue
+
+                # 2. Generate Proposal
+                try:
+                    proposal = generate_proposal(current_base_code)
+                    user_prompt = proposal.get('user_prompt')
+                    search_block = proposal.get('search')
+                    replace_block = proposal.get('replace')
+                    print(f"Prompt: {user_prompt}")
+                    
+                    # Save initial proposal
+                    with open(os.path.join(iter_dir, "proposal.json"), "w") as f:
+                        json.dump(proposal, f, indent=2)
+                except Exception as e:
+                    print(f"Failed to generate valid JSON proposal: {e}. Skipping.")
+                    with open(os.path.join(iter_dir, "error.txt"), "w") as f:
+                        f.write(f"Proposal generation error: {e}")
+                    continue
+                    
+                # 3. Apply Diff & Execute (with retries)
+                max_retries = 3
+                current_try = 0
+                success = False
+                current_search = search_block
+                current_replace = replace_block
+                new_code = ""
+                
+                while current_try < max_retries:
+                    if not current_search or current_search not in current_base_code:
+                        error_msg = f"Search block not found in base code."
+                        print(error_msg)
+                    else:
+                        new_code = current_base_code.replace(current_search, current_replace)
+                        with open(os.path.join(iter_dir, "code.py"), "w") as f:
+                            f.write(new_code)
+                        
+                        new_svg = os.path.join(iter_dir, "new.svg")
+                        new_png = os.path.join(iter_dir, "new.png")
+                        success, error_msg = execute_and_render(new_code, new_svg, new_png, base_dir=base_dir)
+                    
+                    if success:
+                        # Update search/replace to the ones that actually worked
+                        search_block, replace_block = current_search, current_replace
                         break
-                else:
-                    print("Max retries reached. Skipping iteration.")
+                
+                    with open(os.path.join(iter_dir, "error.txt"), "a") as f:
+                        f.write(f"\n[Try {current_try+1}] {error_msg}")
+
+                    current_try += 1
+                    if current_try < max_retries:
+                        print(f"Retry {current_try}/{max_retries} due to error...")
+                        try:
+                            fix_proposal = generate_fix(current_base_code, user_prompt, current_search, current_replace, error_msg)
+                            current_search = fix_proposal.get('search')
+                            current_replace = fix_proposal.get('replace')
+                        except Exception as e:
+                            print(f"Failed to generate fix: {e}")
+                            break
+                    else:
+                        print("Max retries reached. Skipping iteration.")
             
             if not success:
                 continue
                 
-            # 3. Validate with VLM
+            # 4. Validate with VLM
             try:
                 is_valid, vlm_output = validate_with_vlm(user_prompt, base_png, new_png)
-                print(f"VLM Validation: {'PASSED' if is_valid else 'FAILED'}")
+                print(f"VLM Validation: {'SUCCESS' if is_valid else 'FAIL'}")
                 
                 with open(os.path.join(iter_dir, "validation.txt"), "w") as f:
-                    f.write("PASSED" if is_valid else "FAILED")
+                    f.write("SUCCESS" if is_valid else "FAIL")
                 
                 with open(os.path.join(iter_dir, "vlm_output.txt"), "w") as f:
                     f.write(vlm_output)
             except Exception as e:
                 print(f"VLM API Error: {e}. Skipping.")
+                with open(os.path.join(iter_dir, "error.txt"), "a") as f:
+                    f.write(f"\nVLM error: {e}")
                 continue
                 
-            # 4. Save Data
+            # 5. Save Data
             metadata = {
                 "iteration": iter_num,
+                "base_file": base_file,
                 "instruction": user_prompt,
                 "is_valid": is_valid,
                 "vlm_output": vlm_output,
@@ -251,11 +296,12 @@ def main():
             if is_valid:
                 dataset_item = {
                     "instruction": user_prompt,
-                    "base_code": BASE_CODE,
+                    "base_code": current_base_code,
                     "search_block": search_block,
                     "replace_block": replace_block,
                     "new_code": new_code,
-                    "iter_dir": iter_dir
+                    "iter_dir": iter_dir,
+                    "base_file": base_file
                 }
                 dataset_file.write(json.dumps(dataset_item) + "\n")
                 dataset_file.flush()

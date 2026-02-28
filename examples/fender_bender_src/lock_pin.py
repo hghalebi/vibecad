@@ -16,7 +16,6 @@ from build123d import (
     export_stl,
     fillet,
 )
-from ocp_vscode import Camera, show
 
 from bender_config import BenderConfig
 from lock_pin_config import LockPinConfig

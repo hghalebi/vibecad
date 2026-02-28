@@ -1,18 +1,6 @@
 from build123d import *
 
-
 class Shamrock(BaseSketchObject):
-    """Sketch Object: Shamrock
-
-    Adds a four leaf clover
-
-    Args:
-        height (float): y axis dimension
-        rotation (float, optional): angle in degrees. Defaults to 0.
-        align (tuple[Align, Align], optional): alignment. Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
     def __init__(
         self,
         height: float,
@@ -45,10 +33,5 @@ class Shamrock(BaseSketchObject):
             mode=mode,
         )
 
-
-if __name__ == "__main__" or "show_object" in locals():
-    with BuildSketch() as shamrock_example:
-        Shamrock(10)
-
-    if "show_object" in locals():
-        show_object(shamrock_example.sketch)
+with BuildSketch() as shamrock_example:
+    Shamrock(10)

@@ -1,46 +1,15 @@
-"""
-name: "canadian_flag.py"
-title: "Canadian Flag blowing in the wind"
-authors: "Gumyr"
-license: "http://www.apache.org/licenses/LICENSE-2.0"
-created: "2023-02-23"
-modified: "2023-07-31"
-
-description: | 
-    A Canadian Flag blowing in the wind created by projecting planar faces onto a non-planar face (the_wind).
-
-    This example also demonstrates building complex lines that snap to existing features.
-
-has_builder_mode: true
-has_algebra_mode: true
-image_files:
-    - "example_canadian_flag_01.png"
-    - "example_canadian_flag_02.png"
-    - "example_canadian_flag_03.png"
-"""
-
-# [Imports]
 from math import sin, cos, pi
 from build123d import *
-from ocp_vscode import show_object
 
-# [Parameters]
-# Canadian Flags have a 2:1 aspect ratio
 height = 50
 width = 2 * height
 wave_amplitude = 3
 
-# [Code]
-
 def surface(amplitude, u, v):
-    """Calculate the surface displacement of the flag at a given position"""
     return v * amplitude / 20 * cos(3.5 * pi * u) + amplitude / 10 * v * sin(
         1.1 * pi * v
     )
 
-
-# Note that the surface to project on must be a little larger than the faces
-# being projected onto it to create valid projected faces
 the_wind = Face.make_surface_from_array_of_points(
     [
         [
@@ -96,13 +65,4 @@ east_field = east_field_planar.project_to_shape(the_wind, (0, 0, -1))[0]
 center_field = center_field_planar.project_to_shape(the_wind, (0, 0, -1))[0]
 maple_leaf = maple_leaf_planar.project_to_shape(the_wind, (0, 0, -1))[0]
 
-# show_object(
-#     the_wind,
-#     name="the_wind",
-#     options={"alpha": 0.8, "color": (170 / 255, 85 / 255, 255 / 255)},
-# )
-show_object(west_field, name="west", options={"color": (255, 0, 0)})
-show_object(east_field, name="east", options={"color": (255, 0, 0)})
-show_object(center_field, name="center", options={"color": (255, 255, 255)})
-show_object(maple_leaf, name="maple", options={"color": (255, 0, 0)})
-# [End]
+flag = Compound(children=[west_field, east_field, center_field, maple_leaf])

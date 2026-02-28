@@ -1,7 +1,5 @@
 from build123d import *
 
-# Mix context and algebra api for parts
-
 b = Box(1, 2, 3) + Cylinder(0.75, 2.5)
 
 with BuildPart() as bp:
@@ -9,8 +7,6 @@ with BuildPart() as bp:
     Cylinder(0.4, 6, mode=Mode.SUBTRACT)
 
 c = bp.part - Plane.YZ * Cylinder(0.2, 6)
-
-# Mix context and algebra api for sketches
 
 r = Rectangle(1, 2) + Circle(0.75)
 
@@ -20,8 +16,6 @@ with BuildSketch() as bs:
 
 d = bs.sketch - Pos(0, 1) * Circle(0.2)
 
-# Mix context and algebra api for sketches
-
 l1 = Line((-1, 0), (1, 1)) + Line((1, 1), (2, 4))
 
 with BuildLine() as bl:
@@ -30,7 +24,4 @@ with BuildLine() as bl:
 
 e = bl.line + ThreePointArc((-1, 0), (-1.5, 0.5), (-1, 1))
 
-if "show_object" in locals():
-    show_object(Pos(0, -2, 0) * c, "part")
-    show_object(Pos(0, 2, 0) * d, "sketch")
-    show_object(Pos(0, 0, 2) * e, "curve")
+combined = Compound(children=[Pos(0, -2, 0) * c, Pos(0, 2, 0) * d, Pos(0, 0, 2) * e])

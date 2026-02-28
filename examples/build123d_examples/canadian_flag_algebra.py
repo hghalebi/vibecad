@@ -1,27 +1,15 @@
-"""
-for details see `canadian_flag.py`
-"""
-# [Imports]
 from math import sin, cos, pi
 from build123d import *
-from ocp_vscode import *
 
-# [Parameters]
-# Canadian Flags have a 2:1 aspect ratio
 height = 50
 width = 2 * height
 wave_amplitude = 3
 
-# [Code]
 def surface(amplitude, u, v):
-    """Calculate the surface displacement of the flag at a given position"""
     return v * amplitude / 20 * cos(3.5 * pi * u) + amplitude / 10 * v * sin(
         1.1 * pi * v
     )
 
-
-# Note that the surface to project on must be a little larger than the faces
-# being projected onto it to create valid projected faces
 the_wind = Face.make_surface_from_array_of_points(
     [
         [
@@ -68,14 +56,11 @@ center_field_planar = (
     Rectangle(1, 1, align=(Align.CENTER, Align.MIN)) - maple_leaf_planar
 )
 
-
 def scale_move(obj):
     return Plane((width / 2, 0, 10)) * scale(obj, height)
 
-
 def project(obj):
     return obj.faces()[0].project_to_shape(the_wind, (0, 0, -1))[0]
-
 
 maple_leaf_planar = scale_move(maple_leaf_planar)
 center_field_planar = scale_move(center_field_planar)
@@ -85,9 +70,4 @@ east_field = project(east_field_planar)
 center_field = project(center_field_planar)
 maple_leaf = project(maple_leaf_planar)
 
-
-show_object(west_field, name="west", options={"color": (255, 0, 0)})
-show_object(east_field, name="east", options={"color": (255, 0, 0)})
-show_object(center_field, name="center", options={"color": (255, 255, 255)})
-show_object(maple_leaf, name="maple", options={"color": (255, 0, 0)})
-# [End]
+flag = Compound(children=[west_field, east_field, center_field, maple_leaf])

@@ -15,6 +15,3 @@ roller_coaster += Spline(corner @ 1, screw @ 0, tangents=(corner % 1, screw % 0)
 roller_coaster += Spline(
     screw @ 1, (-100, 30, 10), powerup @ 0, tangents=(screw % 1, powerup % 0)
 )
-
-if "show_object" in locals():
-    show_object(roller_coaster)

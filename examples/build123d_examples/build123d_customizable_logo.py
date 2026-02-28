@@ -1,37 +1,5 @@
-"""
-
-name: build123d_customizable_logo.py
-by:   Gumyr and modified by jdegenstein
-date: December 19th 2022
-
-desc:
-
-    This example creates the build123d customizable logo.
-
-license:
-
-    Copyright 2022 Gumyr
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-"""
-# [Imports]
 from build123d import *
-from ocp_vscode import *
 
-# [Parameters]
-# - none
-
-# [Code]
 with BuildSketch() as logo_text:
     Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
     font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
@@ -85,7 +53,6 @@ with BuildLine() as extension_lines:
     Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))
     Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 
-# Precisely center the build Faces
 with BuildSketch() as build:
     with Locations(
         (l1 @ 0.5 + l2 @ 0.5) / 2
@@ -98,18 +65,3 @@ with BuildSketch() as build:
 cmpd = Compound.make_compound(
     [three_d.part, two.sketch, one.line, build.sketch, extension_lines.line]
 )
-
-visible, _hidden = cmpd.project_to_viewport((10, -10, 60))
-max_dimension = max(*Compound(children=visible).bounding_box().size)
-exporter = ExportSVG(scale=100 / max_dimension)
-exporter.add_shape(visible)
-exporter.write(f"cmpd.svg")
-
-show_object(cmpd, name="compound")
-# show_object(one.line.wrapped, name="one")
-# show_object(two.sketch.wrapped, name="two")
-# show_object(three_d.part.wrapped, name="three_d")
-# show_object(extension_lines.line.wrapped, name="extension_lines")
-# show_object(build.sketch.wrapped, name="build")
-
-# [End]

@@ -3,16 +3,13 @@ from build123d import *
 exchanger_diameter = 10 * CM
 exchanger_length = 30 * CM
 plate_thickness = 5 * MM
-# 149 tubes
 tube_diameter = 5 * MM
 tube_spacing = 2 * MM
 tube_wall_thickness = 0.5 * MM
 tube_extension = 3 * MM
 bundle_diameter = exchanger_diameter - 2 * tube_diameter
 fillet_radius = tube_spacing / 3
-assert tube_extension > fillet_radius
 
-# Build the heat exchanger
 tube_locations = [
     l
     for l in HexLocations(
@@ -43,13 +40,5 @@ edges = (
     .group_by(SortBy.RADIUS)[1]
     .group_by()[2]
 )
-half_volume_before_fillet = heat_exchanger.volume
 heat_exchanger = fillet(edges, radius=fillet_radius)
-half_volume_after_fillet = heat_exchanger.volume
 heat_exchanger += mirror(heat_exchanger, Plane.XY)
-
-fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
-assert abs(fillet_volume - 469.88331045553787) < 1e-3
-
-if "show_object" in locals():
-    show_object(heat_exchanger.wrapped)

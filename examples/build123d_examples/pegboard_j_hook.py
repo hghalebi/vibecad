@@ -1,28 +1,7 @@
-"""
-name: pegboard_j_hook.py
-by:   jdegenstein
-date: November 17th 2022
-desc:
-    This example creates a model of j-shaped pegboard hook commonly used
-    for organization of tools in garages.
-
-license:
-    Copyright 2022 jdegenstein
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-        http://www.apache.org/licenses/LICENSE-2.0
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-"""
-
 from build123d import *
 
-pegd = 6.35 + 0.1  # mm ~0.25inch
-c2c = 25.4  # mm 1.0inch
+pegd = 6.35 + 0.1
+c2c = 25.4
 arcd = 7.2
 both = 10
 topx = 6
@@ -65,9 +44,5 @@ with BuildPart() as mainp:
     with BuildSketch(Plane.XZ):
         Circle(radius=midd / 2)
     sweep(path=stub.wires()[0])
-    # splits help keep the object 3d printable by reducing overhang
     split(bisect_by=Plane(origin=(0, 0, -splitz)))
     split(bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
-
-if "show_object" in locals():
-    show_object(mainp.part.wrapped)

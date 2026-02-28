@@ -27,6 +27,3 @@ clock_face -= [
         PolarLocations(clock_radius * 0.75, 12, 60, -360, rotate=False)
     )
 ]
-
-if "show_object" in locals():
-    show_object(clock_face)

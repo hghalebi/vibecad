@@ -9,7 +9,3 @@ blocks2 = chamfer(bottom_edges, length=0.1)
 
 top_edges = blocks2.edges().filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))
 blocks2 = chamfer(top_edges, length=0.1)
-
-
-if "show_object" in locals():
-    show_object(blocks2)

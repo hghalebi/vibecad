@@ -1,48 +1,6 @@
-"""
-
-name: custom_sketch_objects.py
-by:   Gumyr
-date: Jan 21st 2023
-
-desc:
-
-    This example demonstrates the creation of a Playing Card storage box with
-    user generated custom BuildSketch objects. Four new BuildSketch objects are
-    created: Club, Spade, Heart, and Diamond, which are then used to punch
-    holes into the top of the box's lid.
-
-license:
-
-    Copyright 2023 Gumyr
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-"""
 from build123d import *
 
-
 class Club(BaseSketchObject):
-    """Sketch Object: Club
-
-    The club suit symbol from a playing card.
-
-    Args:
-        height (float): size along the Y-axis
-        rotation (float, optional): angle from X-axis. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
     def __init__(
         self,
         height: float,
@@ -50,9 +8,6 @@ class Club(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        # Create the club shape
-        # Note: The workplane and mode must be set here to avoid interactions with
-        #       builders in difference scopes.
         with BuildSketch(Plane.XY, mode=Mode.PRIVATE) as club:
             with BuildLine():
                 l0 = Line((0, -188), (76, -188))
@@ -63,10 +18,7 @@ class Club(BaseSketchObject):
                 mirror(about=Plane.YZ)
             make_face()
             scale(by=height / club.sketch.bounding_box().size.Y)
-
-        # Pass the shape to the BaseSketchObject class to create a new Club object
         super().__init__(obj=club.sketch, rotation=rotation, align=align, mode=mode)
-
 
 class Spade(BaseSketchObject):
     def __init__(
@@ -86,7 +38,6 @@ class Spade(BaseSketchObject):
             make_face()
             scale(by=height / spade.sketch.bounding_box().size.Y)
         super().__init__(obj=spade.sketch, rotation=rotation, align=align, mode=mode)
-
 
 class Heart(BaseSketchObject):
     def __init__(
@@ -108,7 +59,6 @@ class Heart(BaseSketchObject):
             scale(by=height / heart.sketch.bounding_box().size.Y)
         super().__init__(obj=heart.sketch, rotation=rotation, align=align, mode=mode)
 
-
 class Diamond(BaseSketchObject):
     def __init__(
         self,
@@ -126,16 +76,13 @@ class Diamond(BaseSketchObject):
             scale(by=height / diamond.sketch.bounding_box().size.Y)
         super().__init__(obj=diamond.sketch, rotation=rotation, align=align, mode=mode)
 
-
-# The inside of the box fits 2.5x3.5" playing card deck with a small gap
 pocket_w = 2.5 * IN + 2 * MM
 pocket_l = 3.5 * IN + 2 * MM
 pocket_t = 0.5 * IN + 2 * MM
-wall_t = 3 * MM  # Wall thickness
-bottom_t = wall_t / 2  # Top and bottom thickness
-lid_gap = 0.5 * MM  # Spacing between base and lid
-lip_t = wall_t / 2 - lid_gap / 2  # Lip thickness
-
+wall_t = 3 * MM
+bottom_t = wall_t / 2
+lid_gap = 0.5 * MM
+lip_t = wall_t / 2 - lid_gap / 2
 
 with BuildPart() as box_builder:
     with BuildSketch() as box_plan:
@@ -148,15 +95,14 @@ with BuildPart() as box_builder:
     with BuildSketch(Plane.XY.offset(wall_t / 2)):
         offset(box_plan.sketch, amount=-wall_t, mode=Mode.ADD)
     extrude(amount=pocket_t, mode=Mode.SUBTRACT)
-box = box_builder.part
 
 with BuildPart() as lid_builder:
-    add(box_plan.sketch)
+    with BuildSketch():
+        add(box_plan.sketch)
     extrude(amount=pocket_t / 2 + bottom_t)
     with BuildSketch() as pocket:
         offset(box_plan.sketch, amount=-(wall_t - lip_t), mode=Mode.ADD)
     extrude(amount=pocket_t / 2, mode=Mode.SUBTRACT)
-
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as suits:
         with Locations((-0.3 * pocket_w, 0.3 * pocket_l)):
             Heart(pocket_l / 5)
@@ -168,7 +114,3 @@ with BuildPart() as lid_builder:
             Club(pocket_l / 5)
     extrude(amount=-wall_t, mode=Mode.SUBTRACT)
 lid = lid_builder.part.moved(Location((0, 0, (wall_t + pocket_t) / 2)))
-
-if "show_object" in locals():
-    show_object(box, name="box")
-    show_object(lid, name="lid", options={"alpha": 0.6})

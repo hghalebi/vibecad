@@ -1,6 +1,5 @@
 from build123d import *
 
-
 with BuildPart() as blocks:
     with Locations((-1, -1, 0)):
         Box(1, 2, 1, align=(Align.CENTER, Align.MIN, Align.MIN))
@@ -13,7 +12,3 @@ with BuildPart() as blocks:
     chamfer(bottom_edges, length=0.1)
     top_edges = blocks.edges().filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))
     chamfer(top_edges, length=0.1)
-
-
-if "show_object" in locals():
-    show_object(blocks.part.wrapped)
