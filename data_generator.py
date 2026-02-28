@@ -30,8 +30,10 @@ EXAMPLES = [
     "examples/build123d_examples/lego.py",
     "examples/build123d_examples/key_cap.py",
     "examples/build123d_examples/handle.py",
-    "examples/build123d_examples/joints.py",
-    "examples/build123d_examples/tea_cup.py",
+    "examples/build123d_examples/circuit_board.py",
+    "examples/build123d_examples/heat_exchanger.py",
+    #"examples/build123d_examples/joints.py",
+    #"examples/build123d_examples/tea_cup.py",
 ]
 
 client = OpenAI(
