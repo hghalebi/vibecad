@@ -106,7 +106,20 @@ def generate_proposal(base_code):
     if parsed is None:
         print(f"DEBUG: Raw response content: {content}")
         raise ValueError(f"Could not parse JSON from response: {content[:100]}...")
+    
     return parsed
+
+def apply_edits(base_code, edits):
+    """Applies a list of SEARCH/REPLACE blocks to base_code."""
+    new_code = base_code
+    for edit in edits:
+        search = edit.get('search')
+        replace = edit.get('replace')
+        if not search: continue
+        if search not in new_code:
+            return None, f"Search block not found: {search}"
+        new_code = new_code.replace(search, replace)
+    return new_code, None
 
 def execute_and_render(code, svg_filename, png_filename, base_dir=None, runner_path="temp_runner.py"):
     """Executes the code safely and converts the resulting SVG to PNG. Returns (success, error_msg)"""
@@ -146,13 +159,13 @@ def execute_and_render(code, svg_filename, png_filename, base_dir=None, runner_p
         print(f"Render Error: {e}")
         return False, str(e)
 
-def generate_fix(base_code, user_prompt, failed_search, failed_replace, error_message):
+def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message):
     """Uses a coding LLM to fix a failed edit."""
     prompt = FIX_PROMPT.format(
         user_prompt=user_prompt,
+        task_type=task_type,
         base_code=base_code,
-        failed_search=failed_search,
-        failed_replace=failed_replace,
+        failed_edits=json.dumps(failed_edits, indent=2),
         error_message=error_message
     )
 
@@ -254,9 +267,8 @@ def main():
             try:
                 proposal = generate_proposal(current_base_code)
                 user_prompt = proposal.get('user_prompt')
-                search_block = proposal.get('search')
-                replace_block = proposal.get('replace')
-                print(f"Prompt: {user_prompt}")
+                task_type = proposal.get('task_type', 'unknown')
+                print(f"Prompt: {user_prompt} ({task_type})")
                 
                 # Save initial proposal
                 with open(os.path.join(iter_dir, "proposal.json"), "w") as f:
@@ -267,20 +279,29 @@ def main():
                     f.write(f"Proposal generation error: {e}")
                 continue
                 
-            # 3. Apply Diff & Execute (with retries)
+            # 3. Apply Change & Execute (with retries)
             max_retries = 3
             current_try = 0
             success = False
-            current_search = search_block
-            current_replace = replace_block
+            
+            # Extract initial edits/new_code
+            current_edits = proposal.get('edits', [])
+            if not current_edits and 'search' in proposal:
+                current_edits = [{"search": proposal['search'], "replace": proposal['replace']}]
+            current_new_code = proposal.get('new_code')
+            
             new_code = ""
             
             while current_try < max_retries:
-                if not current_search or current_search not in current_base_code:
-                    error_msg = f"Search block not found in base code."
-                    print(error_msg)
+                error_msg = None
+                if current_new_code:
+                    new_code = current_new_code
+                elif current_edits:
+                    new_code, error_msg = apply_edits(current_base_code, current_edits)
                 else:
-                    new_code = current_base_code.replace(current_search, current_replace)
+                    error_msg = "No edits or new_code provided in proposal."
+
+                if not error_msg:
                     with open(os.path.join(iter_dir, "generated_code.py"), "w") as f:
                         f.write(new_code)
                     
@@ -290,10 +311,9 @@ def main():
                     success, error_msg = execute_and_render(new_code, new_svg, new_png, base_dir=base_dir, runner_path=new_runner)
                 
                 if success:
-                    # Update search/replace to the ones that actually worked
-                    search_block, replace_block = current_search, current_replace
                     break
             
+                print(f"Error applying/rendering: {error_msg}")
                 with open(os.path.join(iter_dir, "error.txt"), "a") as f:
                     f.write(f"\n[Try {current_try+1}] {error_msg}")
 
@@ -301,9 +321,9 @@ def main():
                 if current_try < max_retries:
                     print(f"Retry {current_try}/{max_retries} due to error...")
                     try:
-                        fix_proposal = generate_fix(current_base_code, user_prompt, current_search, current_replace, error_msg)
-                        current_search = fix_proposal.get('search')
-                        current_replace = fix_proposal.get('replace')
+                        fix_proposal = generate_fix(current_base_code, user_prompt, task_type, current_edits, error_msg)
+                        current_edits = fix_proposal.get('edits', [])
+                        current_new_code = fix_proposal.get('new_code')
                     except Exception as e:
                         print(f"Failed to generate fix: {e}")
                         break
@@ -334,10 +354,11 @@ def main():
                 "iteration": iter_num,
                 "base_file": base_file,
                 "instruction": user_prompt,
+                "task_type": task_type,
                 "is_valid": is_valid,
                 "vlm_output": vlm_output,
-                "search_block": search_block,
-                "replace_block": replace_block,
+                "edits": current_edits,
+                "has_new_code": bool(current_new_code),
                 "run_id": timestamp,
                 "retries": current_try
             }
@@ -347,9 +368,9 @@ def main():
             if is_valid:
                 dataset_item = {
                     "instruction": user_prompt,
+                    "task_type": task_type,
                     "base_code": current_base_code,
-                    "search_block": search_block,
-                    "replace_block": replace_block,
+                    "edits": current_edits,
                     "new_code": new_code,
                     "iter_dir": iter_dir,
                     "base_file": base_file
@@ -358,6 +379,7 @@ def main():
                 dataset_file.flush()
                 success_count += 1
                 print(f"Saved successful iteration! (Total valid: {success_count})")
+
 
 
 if __name__ == "__main__":

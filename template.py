@@ -107,20 +107,13 @@ exporter.write(OUTPUT_FILENAME)
 """
 
 PROPOSAL_PROMPT = """You are an expert in python and build123d. 
-Look at the following build123d script. Propose a natural language user request to modify the CAD geometry.
-Then, provide the exact SEARCH block (the code to be replaced) and REPLACE block (the new code).
-
-Available common objects:
-- Sketch objects: Circle, Rectangle, RectangleRounded, RegularPolygon, Polygon, SlotCenterPoint, SlotCenterToCenter, SlotOverall, Text, Trapezoid.
-- 3D objects: Box, Cylinder, Cone, Sphere, Torus, Wedge.
-- Operations: extrude, revolve, sweep, loft, fillet, chamfer, mirror, scale, offset.
-- Locations: PolarLocations, GridLocations, HexLocations.
-
-Common pitfalls:
-- Use `RectangleRounded(width, height, radius)` instead of `RoundedRectangle`.
-- List comprehensions for points should be like `[(x, y, z) for ...]` or `[Vector(x, y, z) for ...]`.
-- `fillet(objects, radius)` and `chamfer(objects, length)` are common.
-- When adding a sketch object to a builder, it is automatically added unless `mode=Mode.PRIVATE` is used.
+Look at the following build123d script. Propose a common code change task that a user might request.
+Stick to common tasks performed by coding models, such as:
+- **Refactoring**: Introducing variables/parameters, using loops, or extracting logic into functions.
+- **Feature Addition**: Adding new elements (holes, fillets, chamfers, labels, handles, mounting points).
+- **Design Variation**: Changing the topology or structure of the part.
+- **Optimization**: Improving code readability or structure.
+- **Parameter Tuning**: Modifying dimensions or counts.
 
 Base Code:
 ```python
@@ -129,44 +122,50 @@ Base Code:
 
 Output strictly in JSON format matching this schema:
 {{
-  \"user_prompt\": \"The natural language instruction\",
-  \"search\": \"exact string from base code to replace\",
-  \"replace\": \"the new string to insert\"
-}}"""
+  "user_prompt": "The natural language instruction",
+  "explanation": "Brief technical explanation of the change",
+  "task_type": "one of: refactor, feature, design, optimization, parameter",
+  "edits": [
+    {{
+      "search": "exact string from base code to replace",
+      "replace": "the new string to insert"
+    }}
+  ],
+  "new_code": "Alternatively, provide the ENTIRE new file code if multiple surgical edits are too complex"
+}}
+
+Note: Prefer 'edits' for small changes and 'new_code' for major structural changes."""
 
 FIX_PROMPT = """You are an expert in python and build123d. 
-You previously proposed a change that failed with an error.
+You previously proposed a change that failed.
 
-User Request: \"{user_prompt}\"
-
-Available common objects:
-- Sketch objects: Circle, Rectangle, RectangleRounded, RegularPolygon, Polygon, SlotCenterPoint, SlotCenterToCenter, SlotOverall, Text, Trapezoid.
-- 3D objects: Box, Cylinder, Cone, Sphere, Torus, Wedge.
+User Request: "{user_prompt}"
+Task Type: "{task_type}"
 
 Base Code:
 ```python
 {base_code}
 ```
 
-You tried to replace:
-```python
-{failed_search}
-```
-with:
-```python
-{failed_replace}
-```
+Failed Edits (if any):
+{failed_edits}
 
 Error Message:
 ```
 {error_message}
 ```
 
-Please provide a CORRECTED SEARCH/REPLACE block that achieves the user request.
+Please provide a CORRECTED version of the change.
 Output strictly in JSON format matching this schema:
 {{
-  \"search\": \"exact string from base code to replace\",
-  \"replace\": \"the new string to insert\"
+  "explanation": "Brief technical explanation of the fix",
+  "edits": [
+    {{
+      "search": "exact string from base code to replace",
+      "replace": "the new string to insert"
+    }}
+  ],
+  "new_code": "Alternatively, provide the ENTIRE new file code"
 }}"""
 
 VALIDATION_PROMPT = """You are a CAD validation agent. 
