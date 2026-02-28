@@ -134,18 +134,16 @@ exporter.write(OUTPUT_FILENAME)
 
 PROPOSAL_PROMPT = """You are an expert in python and build123d. 
 Look at the following build123d script and the provided render of the model. 
-Propose a meaningful 3D CAD modeling task that a user might request.
-Focus on geometric changes and model structure. Do NOT propose pure refactoring or simple variable name changes.
+Propose a clear and well-defined 3D CAD modeling task that a user might request.
+Focus on a single, reliable geometric change.
 
-Tasks should involve clear geometric modifications, such as:
-- **Functional Feature Addition**: Adding practical features like mounting holes, simple brackets, reinforcement ribs, custom labels, or protective rims.
-- **Geometric Variation**: Modifying existing shapes (e.g., changing a sharp corner to a specific fillet/chamfer, adding a cutout pattern, or extending a part's reach).
-- **Component Integration**: Adding features to allow the part to interface with common hardware (e.g., a hex nut pocket, a countersunk screw hole, or a slot for a belt).
-- **Dimension Modification**: Adjusting the primary dimensions (length, width, height, or thickness) of the part's main body or specific components.
-- **Feature Patterning**: Repeating an existing feature (like a hole or a post) in a simple linear or polar array.
-- **Subtractive Geometry**: Adding a single, well-defined cutout or pocket (e.g., a circular hole, a rectangular slot) to a specific face.
+Tasks should involve clear, simple modifications, such as:
+- **Feature Addition**: Adding a single practical feature like a mounting hole, a small boss, or a recessed pocket.
+- **Geometric Variation**: Modifying an existing shape (e.g., adding a fillet or chamfer to an edge, or changing a single dimension).
+- **Subtractive Geometry**: Adding a single, well-defined cutout (e.g., a circular hole, a rectangular slot) to a specific face.
+- **Dimension Modification**: Adjusting a primary dimension (length, width, or height) of a component.
 
-The task should require modifying or adding a few blocks of build123d code.
+The task should be straightforward and require modifying or adding a few lines of build123d code.
 
 Base Code:
 ```python
@@ -156,14 +154,14 @@ Output strictly in JSON format matching this schema:
 {{
   "user_prompt": "The natural language instruction",
   "explanation": "Brief technical explanation of the change",
-  "task_type": "one of: feature_addition, geometric_variation, component_integration, dimension_modification, feature_patterning, subtractive_geometry",
+  "task_type": "one of: feature_addition, geometric_variation, dimension_modification, subtractive_geometry",
   "edits": [
     {{
       "search": "exact string from base code to replace",
       "replace": "the new string to insert"
     }}
   ],
-  "new_code": "Provide the ENTIRE new file code here. This is preferred for ensuring structural integrity."
+  "new_code": "Provide the ENTIRE new file code here. This is HIGHLY preferred."
 }}"""
 
 FIX_PROMPT = """You are an expert in python and build123d. 

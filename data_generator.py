@@ -23,8 +23,10 @@ if not OPENROUTER_API_KEY:
     print("Warning: OPENROUTER_API_KEY environment variable not set.")
 
 # Models to use
-CODING_MODEL = "anthropic/claude-sonnet-4.6"
-VLM_MODEL = "anthropic/claude-sonnet-4.6"
+#CODING_MODEL = "anthropic/claude-sonnet-4.6"
+#VLM_MODEL = "anthropic/claude-sonnet-4.6"
+CODING_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
+VLM_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
 
 ITERATIONS = 50
 OUTPUT_FILE = "build123d_agent_dataset.jsonl"
@@ -50,12 +52,12 @@ from template import RENDER_TEMPLATE, PROPOSAL_PROMPT, FIX_PROMPT, VALIDATION_PR
 # 2. Complexity Strategies
 # ==========================================
 COMPLEXITY_STRATEGIES = [
-    "Add functional features like mounting holes (e.g., for M3 screws), simple support brackets, or reinforcement ribs.",
-    "Introduce clear geometric modifications like adding a specific cutout pattern, transforming sharp edges into fillets or chamfers, or adding a recessed label/logo.",
-    "Add practical component interfaces like a hex nut pocket, a slot for a timing belt, or a countersunk hole.",
-    "Modify primary dimensions (e.g., length, width, or height) of the main body to change the part's overall size while keeping the topology intact.",
-    "Create a linear or polar array of an existing feature (like a hole, a post, or a boss) to repeat it across the part.",
-    "Add a single, well-defined subtractive feature (like a circular hole or a rectangular slot) on a specific face of the part."
+    "Add a single functional feature like a mounting hole (e.g., for an M3 screw) on a flat face.",
+    "Introduce a simple geometric modification like adding a fillet or chamfer to specific edges.",
+    "Add a single subtractive feature like a circular hole or a rectangular slot on a specific face.",
+    "Modify one or two primary dimensions (e.g., length or width) to slightly change the part's size.",
+    "Add a small boss, post, or recessed pocket to a main face.",
+    "Create a simple linear array of 2 or 3 holes across a flat surface."
 ]
 
 # ==========================================
@@ -101,10 +103,10 @@ def parse_json_response(content):
     return None
 
 def generate_proposal(base_code, base_png):
-    """Uses a coding LLM to propose a complex edit, using the base render for context."""
+    """Uses a coding LLM to propose a clear edit, using the base render for context."""
     strategy = random.choice(COMPLEXITY_STRATEGIES)
     prompt = PROPOSAL_PROMPT.format(base_code=base_code)
-    prompt += f"\n\nIMPORTANT: For this task, focus on this complexity strategy: {strategy}"
+    prompt += f"\n\nIMPORTANT: For this task, focus on this simple, well-defined strategy: {strategy}"
 
     base64_base = encode_image(base_png)
 
@@ -112,7 +114,7 @@ def generate_proposal(base_code, base_png):
         model=CODING_MODEL,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You only propose complex, high-impact geometric modifications and avoid simple refactoring or parameter tweaks. You prefer providing full code via 'new_code' for any non-trivial structural changes."},
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You propose clear, reliable, and well-defined geometric modifications. You prefer providing full code via 'new_code' to ensure the final script is complete and functional."},
             {
                 "role": "user",
                 "content": [
@@ -195,7 +197,7 @@ def generate_fix(base_code, user_prompt, task_type, failed_edits, error_message)
         model=CODING_MODEL,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You provide robust, high-quality fixes for complex 3D modeling code. You prefer providing full code via 'new_code' to resolve structural or execution errors."},
+            {"role": "system", "content": "You are a world-class CAD engineer specializing in build123d. You provide robust, high-quality fixes for 3D modeling code. You prefer providing full code via 'new_code' to ensure the final script is correct."},
             {"role": "user", "content": prompt}
         ]
     )
@@ -306,9 +308,8 @@ def main():
                 continue
                 
             # 3. Apply Change & Execute (with retries)
-            max_retries = 3
-            current_try = 0
-            success = False
+            vlm_retry_count = 0
+            max_vlm_retries = 1
             
             # Extract initial edits/new_code
             current_edits = proposal.get('edits', [])
@@ -317,62 +318,90 @@ def main():
             current_new_code = proposal.get('new_code')
             
             new_code = ""
+            is_valid = False
+            vlm_output = ""
+            success = False
             
-            while current_try < max_retries:
-                error_msg = None
-                if current_new_code:
-                    new_code = current_new_code
-                elif current_edits:
-                    new_code, error_msg = apply_edits(current_base_code, current_edits)
-                else:
-                    error_msg = "No edits or new_code provided in proposal."
-
-                if not error_msg:
-                    with open(os.path.join(iter_dir, "generated_code.py"), "w") as f:
-                        f.write(new_code)
-                    
-                    new_svg = os.path.join(iter_dir, "new.svg")
-                    new_png = os.path.join(iter_dir, "new.png")
-                    new_runner = os.path.join(iter_dir, "new_runner.py")
-                    success, error_msg = execute_and_render(new_code, new_svg, new_png, base_dir=base_dir, runner_path=new_runner)
+            while vlm_retry_count <= max_vlm_retries:
+                max_retries = 3
+                current_try = 0
+                success = False
                 
-                if success:
-                    break
-            
-                print(f"Error applying/rendering: {error_msg}")
-                with open(os.path.join(iter_dir, "error.txt"), "a") as f:
-                    f.write(f"\n[Try {current_try+1}] {error_msg}")
+                while current_try < max_retries:
+                    error_msg = None
+                    if current_new_code:
+                        new_code = current_new_code
+                    elif current_edits:
+                        new_code, error_msg = apply_edits(current_base_code, current_edits)
+                    else:
+                        error_msg = "No edits or new_code provided in proposal."
 
-                current_try += 1
-                if current_try < max_retries:
-                    print(f"Retry {current_try}/{max_retries} due to error...")
+                    if not error_msg:
+                        with open(os.path.join(iter_dir, "generated_code.py"), "w") as f:
+                            f.write(new_code)
+                        
+                        new_svg = os.path.join(iter_dir, "new.svg")
+                        new_png = os.path.join(iter_dir, "new.png")
+                        new_runner = os.path.join(iter_dir, "new_runner.py")
+                        success, error_msg = execute_and_render(new_code, new_svg, new_png, base_dir=base_dir, runner_path=new_runner)
+                    
+                    if success:
+                        break
+                
+                    print(f"Error applying/rendering: {error_msg}")
+                    with open(os.path.join(iter_dir, "error.txt"), "a") as f:
+                        f.write(f"\n[VLM Try {vlm_retry_count}, Code Try {current_try+1}] {error_msg}")
+
+                    current_try += 1
+                    if current_try < max_retries:
+                        print(f"Retry {current_try}/{max_retries} due to error...")
+                        try:
+                            fix_proposal = generate_fix(current_base_code, user_prompt, task_type, current_edits, error_msg)
+                            current_edits = fix_proposal.get('edits', [])
+                            current_new_code = fix_proposal.get('new_code')
+                        except Exception as e:
+                            print(f"Failed to generate fix: {e}")
+                            break
+                    else:
+                        print("Max code retries reached.")
+                
+                if not success:
+                    break # Failed to get executable code
+                    
+                # 4. Validate with VLM
+                try:
+                    is_valid, vlm_output = validate_with_vlm(user_prompt, base_png, new_png)
+                    print(f"VLM Validation (Try {vlm_retry_count}): {'SUCCESS' if is_valid else 'FAIL'}")
+                    
+                    # Save validation results
+                    v_filename = "validation.txt" if vlm_retry_count == 0 else f"validation_retry_{vlm_retry_count}.txt"
+                    o_filename = "vlm_output.txt" if vlm_retry_count == 0 else f"vlm_output_retry_{vlm_retry_count}.txt"
+                    
+                    with open(os.path.join(iter_dir, v_filename), "w") as f:
+                        f.write("SUCCESS" if is_valid else "FAIL")
+                    
+                    with open(os.path.join(iter_dir, o_filename), "w") as f:
+                        f.write(vlm_output)
+                        
+                    if is_valid or vlm_retry_count >= max_vlm_retries:
+                        break
+                    
+                    print(f"VLM Validation failed. Attempting fix based on VLM feedback...")
+                    vlm_retry_count += 1
                     try:
-                        fix_proposal = generate_fix(current_base_code, user_prompt, task_type, current_edits, error_msg)
+                        fix_proposal = generate_fix(current_base_code, user_prompt, task_type, current_edits, vlm_output)
                         current_edits = fix_proposal.get('edits', [])
                         current_new_code = fix_proposal.get('new_code')
                     except Exception as e:
-                        print(f"Failed to generate fix: {e}")
+                        print(f"Failed to generate fix from VLM: {e}")
                         break
-                else:
-                    print("Max retries reached. Skipping iteration.")
+                except Exception as e:
+                    print(f"VLM API Error: {e}")
+                    with open(os.path.join(iter_dir, "error.txt"), "a") as f:
+                        f.write(f"\nVLM error: {e}")
+                    break
             
             if not success:
-                continue
-                
-            # 4. Validate with VLM
-            try:
-                is_valid, vlm_output = validate_with_vlm(user_prompt, base_png, new_png)
-                print(f"VLM Validation: {'SUCCESS' if is_valid else 'FAIL'}")
-                
-                with open(os.path.join(iter_dir, "validation.txt"), "w") as f:
-                    f.write("SUCCESS" if is_valid else "FAIL")
-                
-                with open(os.path.join(iter_dir, "vlm_output.txt"), "w") as f:
-                    f.write(vlm_output)
-            except Exception as e:
-                print(f"VLM API Error: {e}. Skipping.")
-                with open(os.path.join(iter_dir, "error.txt"), "a") as f:
-                    f.write(f"\nVLM error: {e}")
                 continue
                 
             # 5. Save Data
@@ -386,7 +415,8 @@ def main():
                 "edits": current_edits,
                 "has_new_code": bool(current_new_code),
                 "run_id": timestamp,
-                "retries": current_try
+                "retries": current_try,
+                "vlm_retries": vlm_retry_count
             }
             with open(os.path.join(iter_dir, "metadata.json"), "w") as f:
                 json.dump(metadata, f, indent=2)
