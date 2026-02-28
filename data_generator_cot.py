@@ -32,7 +32,6 @@ EXAMPLES = [
     "examples/simple_models/circular_flange.py",
     "examples/simple_models/simple_knob.py",
     "examples/simple_models/spacer.py",
-    "examples/simple_models/u_bracket.py",
 ]
 
 client = OpenAI(
