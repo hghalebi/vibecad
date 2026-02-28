@@ -209,3 +209,103 @@ Your goal is to verify if the modification is exactly as requested and if the re
 Be highly critical. If there are any discrepancies, missing features, or unintended distortions, you must conclude with FAIL.
 Provide a detailed step-by-step analysis of the changes you observe.
 Conclude with EXACTLY the word "SUCCESS" or "FAIL" on a new line."""
+
+MUTATION_PROMPT = """You are a world-class CAD engineer specializing in build123d.
+Your goal is to modify an existing build123d script to add a new, meaningful feature or modification.
+
+### Guidelines:
+1. **Variety**: Choose a modification like adding or removing a hole, a fillet, a chamfer, a pocket, a boss, or modifying a key dimension.
+2. **Robustness**: Use ROBUST SELECTORS (e.g., `faces().sort_by(Axis.Z)[-1]`) instead of indices.
+3. **Visibility**: Ensure the change is clearly visible in a standard 4-view render (Isometric, Front, Top, Right).
+4. **Complexity**: Aim for a single, well-defined change that an engineer might realistically ask for.
+
+Base Code:
+```python
+{base_code}
+```
+
+Suggested Strategy: {strategy}
+
+Output strictly in JSON format matching this schema:
+{{
+  "analysis": "Brief analysis of the current geometry",
+  "mutation_plan": "Description of the change you will make",
+  "new_code": "The ENTIRE new file code",
+  "task_type": "one of: feature_addition, geometric_variation, dimension_modification, subtractive_geometry"
+}}"""
+
+INVERSE_LABEL_PROMPT = """You are a CAD instructor. Your task is to look at a "Before" and "After" state of a 3D model and write the EXACT instruction that a user would have given to achieve this change.
+
+### Context:
+- **Image 1**: The "Before" state.
+- **Image 2**: The "After" state.
+- **Geometric Metrics Change**:
+{metrics_diff}
+- **Code Diff**:
+```diff
+{code_diff}
+```
+
+### Goal:
+Write a concise, professional, and unambiguous natural language instruction (1-2 sentences) that describes the modification. The instruction should be specific enough that a CAD expert could replicate the change just by reading it. Mention specific faces (e.g., "top face", "side face furthest in +X") or dimensions where appropriate.
+
+Output strictly in JSON format matching this schema:
+{{
+  "instruction": "The natural language instruction",
+  "technical_summary": "A brief technical summary of what was changed"
+}}"""
+
+COT_MUTATION_PROMPT = """You are a world-class CAD engineer specializing in build123d.
+Your goal is to modify an existing build123d script by adding or subtracting a simple primitive shape using boolean operations.
+
+### Chain of Thought Process:
+1. **Analyze Current Geometry**: What are the main features and dimensions?
+2. **Identify Target Face**: Which face will you modify? Use robust selectors (e.g., `.sort_by(Axis.Z)[-1]`).
+3. **Choose Primitive**: Select a simple shape (Box, Cylinder, Sphere) to add or subtract.
+4. **Define Parameters**: What are the dimensions and position of the new primitive?
+5. **Determine Mode**: Should it be added (`Mode.ADD`) or subtracted (`Mode.SUBTRACT`)?
+6. **Code Synthesis**: Write the final code.
+
+Base Code:
+```python
+{base_code}
+```
+
+Suggested Strategy: {strategy}
+
+Output strictly in JSON format matching this schema:
+{{
+  "thought": "Your step-by-step chain of thought reasoning",
+  "analysis": "Brief analysis of the current geometry",
+  "mutation_plan": "Description of the change you will make",
+  "new_code": "The ENTIRE new file code",
+  "task_type": "one of: feature_addition, geometric_variation, dimension_modification, subtractive_geometry"
+}}"""
+
+COT_LABEL_PROMPT = """You are a CAD instructor. Compare the "Before" and "After" states of a 3D model and write the EXACT instruction that a user would have given to achieve this change.
+
+### Context:
+- **Image 1**: The "Before" state.
+- **Image 2**: The "After" state.
+- **Geometric Metrics Change**:
+{metrics_diff}
+- **Code Diff**:
+```diff
+{code_diff}
+```
+
+### Chain of Thought Process:
+1. **Observation**: What is the most obvious difference between the images?
+2. **Detailed Comparison**: 
+   - Is a feature added or removed?
+   - What is its shape (circular, rectangular, etc.)?
+   - Where is it located relative to the original body and axes?
+   - What are its approximate dimensions?
+3. **Synthesis**: Combine these observations into a clear, professional instruction.
+
+Output strictly in JSON format matching this schema:
+{{
+  "thought": "Your step-by-step chain of thought reasoning",
+  "instruction": "The final natural language instruction",
+  "technical_summary": "A brief technical summary of what was changed"
+}}"""
