@@ -14,7 +14,6 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 CODING_MODEL = "anthropic/claude-sonnet-4.6"
 DESIGNER_MODEL = "anthropic/claude-sonnet-4.6"
 DOCS_PATH = "build123d_reference.md"
-OUTPUT_DIR = "agent_iterations"
 MAX_ITERATIONS = 100
 
 if not OPENROUTER_API_KEY:
@@ -99,10 +98,10 @@ def _render_to_png(obj, filename):
 _render_to_png(OBJ, OUTPUT_FILENAME)
 """
 
-def run_cad_code(code, iteration):
+def run_cad_code(code, iteration, output_dir):
     """Executes the code and generates a render."""
-    script_path = os.path.join(OUTPUT_DIR, f"iter_{iteration}.py")
-    render_path = os.path.abspath(os.path.join(OUTPUT_DIR, f"render_{iteration}.png"))
+    script_path = os.path.join(output_dir, f"iter_{iteration}.py")
+    render_path = os.path.abspath(os.path.join(output_dir, f"render_{iteration}.png"))
     
     # Prepend imports if missing and append rendering logic
     full_code = f"from build123d import *\n" if "from build123d import" not in code else ""
@@ -175,13 +174,33 @@ Focus on being a mentor who guides the build process one step at a time. Your fe
 # --- MAIN LOOP ---
 
 def main():
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-
-    goal = 'design an L-shaped 50x50mm angle bracket from 3mm sheet metal. Start with an L-shaped 2D sketch and extrude it to make it 3D. The angle bracket is used to stiffen a vertical and horizotal panels that are connected together by their end.  The bracket has two mounting holes on each side, suitable for mounting it to the plates. Use good industry standard practices.'
+    # --- GOAL SELECTION ---
+    GOALS = [
+        ("angle_bracket", "design an L-shaped 50x50mm angle bracket from 3mm sheet metal. Start with an L-shaped 2D sketch and extrude it to make it 3D. The angle bracket is used to stiffen a vertical and horizotal panels that are connected together by their end.  The bracket has two mounting holes on each side, suitable for mounting it to the plates. Use good industry standard practices."),
+        ("circular_flange", "design a circular flange with a 100mm diameter and 10mm thickness. It should have a central hole of 40mm diameter and four 10mm mounting holes equally spaced on a bolt circle of 80mm diameter."),
+        ("u_bracket", "design a simple U-bracket. It should be 40mm wide, 40mm tall, and 40mm deep, made from 2mm thick material. Add a 10mm hole in the center of the base."),
+        ("hex_nut", "design a hex nut for an M10 bolt. The width across flats should be 17mm and the height should be 8mm. It should have a 10mm clearance hole in the center."),
+        ("electronics_enclosure", "design a simple rectangular electronics enclosure base. Dimensions: 100x60x30mm with 2mm wall thickness. It should be open at the top (a box with no lid). Add four 3mm mounting posts in the corners."),
+        ("bearing_block", "design a pillow block bearing house. It should have a rectangular base of 100x30x10mm with two 10mm mounting holes at the ends (80mm apart). In the center of the base, there should be a vertical cylindrical housing with an outer diameter of 50mm and a height of 40mm (from the bottom of the base). The housing should have a central bore of 30mm diameter for the bearing. Add 5mm fillets where the housing meets the base."),
+        ("stepper_motor_mount", "design an NEMA 17 stepper motor mount. It's an L-shaped bracket. The motor mounting face is 42x42mm with a 22mm central hole for the motor boss and four 3.5mm holes on a 31mm square pattern. The other face is for mounting the bracket to a surface, 42x50mm with two 5mm slots. Use 3mm thickness."),
+        ("pulley", "design a timing belt pulley. It has a central hub of 20mm diameter and 15mm height with an 8mm bore. The main body is 40mm diameter and 10mm height. Add two 45mm diameter flanges of 2mm thickness on both sides of the main body.")
+    ]
     
+    selected_name = "bearing_block"
+    goal_item = next((item for item in GOALS if item[0] == selected_name), None)
+    if goal_item:
+        goal_name, goal = goal_item
+    else:
+        print(f"Goal '{selected_name}' not found. Defaulting to first goal.")
+        goal_name, goal = GOALS[0]
+        
+    output_dir = f"agent_iterations_{goal_name}"
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     # Save the goal
-    with open(os.path.join(OUTPUT_DIR, "goal.txt"), "w") as f:
+    with open(os.path.join(output_dir, "goal.txt"), "w") as f:
         f.write(goal)
 
     docs_context = ""
@@ -207,7 +226,7 @@ def main():
         print("Coding Agent is generating model...")
         
         # Save coding prompt (history)
-        with open(os.path.join(OUTPUT_DIR, f"prompt_coding_{i}.json"), "w") as f:
+        with open(os.path.join(output_dir, f"prompt_coding_{i}.json"), "w") as f:
             json.dump(coding_history, f, indent=2)
 
         try:
@@ -219,7 +238,7 @@ def main():
             raw_response = response.choices[0].message.content
             
             # Save coding response
-            with open(os.path.join(OUTPUT_DIR, f"response_coding_{i}.txt"), "w") as f:
+            with open(os.path.join(output_dir, f"response_coding_{i}.txt"), "w") as f:
                 f.write(raw_response)
                 
             code = raw_response.strip()
@@ -235,12 +254,12 @@ def main():
         
         # 2. Execute and Render
         print("Running build123d kernel and rendering views...")
-        success, error_msg, render_path = run_cad_code(code, i)
+        success, error_msg, render_path = run_cad_code(code, i, output_dir)
         
         if not success:
             print(f"Execution failed. Feeding back error to agent.")
             # Save error message
-            with open(os.path.join(OUTPUT_DIR, f"error_{i}.txt"), "w") as f:
+            with open(os.path.join(output_dir, f"error_{i}.txt"), "w") as f:
                 f.write(error_msg)
                 
             coding_history.append({"role": "assistant", "content": f"```python\n{code}\n```"})
@@ -282,9 +301,9 @@ def main():
             # Save designer prompt (excluding image for brevity)
             compact_designer_messages = [
                 {"role": "system", "content": designer_messages[0]["content"]},
-                {"role": "user", "content": "Iteration {i} result with previous and current renders."}
+                {"role": "user", "content": f"Iteration {i} result with previous and current renders."}
             ]
-            with open(os.path.join(OUTPUT_DIR, f"prompt_designer_{i}.json"), "w") as f:
+            with open(os.path.join(output_dir, f"prompt_designer_{i}.json"), "w") as f:
                 json.dump(compact_designer_messages, f, indent=2)
 
             designer_response = client.chat.completions.create(
@@ -296,7 +315,7 @@ def main():
             print(f"Designer Feedback: {critique}")
             
             # Save designer response
-            with open(os.path.join(OUTPUT_DIR, f"response_designer_{i}.txt"), "w") as f:
+            with open(os.path.join(output_dir, f"response_designer_{i}.txt"), "w") as f:
                 f.write(critique)
 
             # 4. Update coding history for next loop
@@ -315,7 +334,7 @@ def main():
             print(f"API Error (Designer): {e}")
             break
 
-    print(f"\nProcess complete. Iteration files and renders saved in '{OUTPUT_DIR}/'.")
+    print(f"\nProcess complete. Iteration files and renders saved in '{output_dir}/'.")
 
 if __name__ == "__main__":
     main()

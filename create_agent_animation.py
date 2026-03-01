@@ -57,6 +57,18 @@ def create_animation(input_dir, output_file, fps=2):
             os.remove(list_file)
 
 if __name__ == "__main__":
-    input_directory = "agent_iterations"
-    output_filename = "agent_interaction_animation.mp4"
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python create_agent_animation.py <directory_path>")
+        sys.exit(1)
+    
+    input_directory = sys.argv[1].rstrip("/")
+    # Use the directory name for the output file
+    dir_name = os.path.basename(input_directory)
+    output_filename = f"{dir_name}.mp4"
+    
+    if not os.path.isdir(input_directory):
+        print(f"Error: {input_directory} is not a directory.")
+        sys.exit(1)
+        
     create_animation(input_directory, output_filename)
