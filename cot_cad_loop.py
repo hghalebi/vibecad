@@ -191,7 +191,7 @@ def main():
         ("pulley", "design a timing belt pulley. It has a central hub of 20mm diameter and 15mm height with an 8mm bore. The main body is 40mm diameter and 10mm height. Add two 45mm diameter flanges of 2mm thickness on both sides of the main body.")
     ]
     
-    selected_name = "bearing_block"
+    selected_name = "pulley"
     goal_item = next((item for item in GOALS if item[0] == selected_name), None)
     if goal_item:
         goal_name, goal = goal_item

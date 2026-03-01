@@ -1,0 +1,40 @@
+I'll build this timing belt pulley incrementally. Let me start with the basic structure: the main body, hub, and flanges.
+
+**Step 1: Main body (40mm dia, 10mm height) + Hub (20mm dia, 15mm height) + Flanges (45mm dia, 2mm thick)**
+
+```python
+from build123d import *
+
+# --- Main Body ---
+# 40mm diameter, 10mm height, centered at origin
+main_body = Cylinder(radius=20, height=10)
+
+# --- Central Hub ---
+# 20mm diameter (10mm radius), 15mm height
+# Centered vertically with the main body center
+hub = Cylinder(radius=10, height=15)
+
+# --- Flanges ---
+# 45mm diameter (22.5mm radius), 2mm thick
+# One on each side of the main body (main body is 10mm tall, so ±5mm from center)
+flange_bottom = Pos(0, 0, -5 - 1) * Cylinder(radius=22.5, height=2)  # bottom flange center at Z=-6
+flange_top    = Pos(0, 0,  5 + 1) * Cylinder(radius=22.5, height=2)  # top flange center at Z=+6
+
+# --- Bore ---
+# 8mm diameter (4mm radius) through everything
+bore = Cylinder(radius=4, height=20)  # tall enough to pass through hub
+
+# --- Assemble ---
+pulley = main_body + hub + flange_bottom + flange_top - bore
+
+OBJ = pulley
+```
+
+**What's been built:**
+- ✅ **Main body**: 40mm dia × 10mm tall, centered at origin
+- ✅ **Hub**: 20mm dia × 15mm tall, centered (extends ±7.5mm in Z)
+- ✅ **Bottom flange**: 45mm dia × 2mm, sitting flush against the bottom of the main body
+- ✅ **Top flange**: 45mm dia × 2mm, sitting flush against the top of the main body
+- ✅ **8mm bore**: drilled through the full assembly
+
+Next steps could include: adding timing belt teeth around the main body, keyway slot in the bore, or fillets for a cleaner finish. What would you like to add?
