@@ -1,0 +1,70 @@
+## Comparison Analysis
+
+### Visual Differences
+The PREVIOUS and CURRENT renders appear **virtually identical**. The transition from the algebraic (functional) API to the `BuildPart` context manager API produced the same visual result, which confirms the refactoring was successful without changing geometry.
+
+### Current State Assessment
+
+Looking at the renders carefully against the design requirements:
+
+**✅ What's correct:**
+- Rectangular base ~100×30×10mm
+- Central cylindrical housing with outer diameter ~50mm
+- Housing rises from the base
+- Central bore (30mm diameter) through the housing
+- Two mounting holes at the ends of the base
+- Some fillet visible at the housing-base junction
+
+**⚠️ Issues to verify:**
+
+1. **Fillet size**: The spec calls for **5mm fillets** where housing meets base. The current code only attempts radii of 2, 1.5, 1, 0.5mm — significantly smaller than required. The fillet visible in the render looks quite small/subtle.
+
+2. **Housing height**: The cylinder starts at Z=5 (top of base) with height 40mm, so it reaches Z=45. That's correct — 40mm from bottom of base.
+
+3. **Bore**: Radius 15 = 30mm diameter ✅
+
+4. **Mounting holes**: At ±40mm = 80mm apart, radius 5 = 10mm diameter ✅
+
+### Next Step: Fix the Fillet Radius
+
+The most critical remaining issue is achieving the **5mm fillet** at the housing-base junction. The current fallback attempts are too small. Use a more reliable edge selection approach:
+
+```python
+from build123d import *
+
+with BuildPart() as pb:
+    Box(100, 30, 10)
+    
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    
+    # Select the circular edges at Z=5 (junction between housing and base top face)
+    # These are the edges where the cylinder meets the top of the base
+    junction_edges = pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+        Axis.Z, 4.9, 5.1  # tighter Z filter right at the base top surface
+    )
+    
+    # Try 5mm fillet as specified, with fallbacks
+    for r in [5, 4, 3, 2]:
+        try:
+            fillet(junction_edges, radius=r)
+            print(f"Fillet applied: {r}mm")
+            break
+        except Exception as ex:
+            print(f"Radius {r} failed: {ex}")
+            continue
+    
+    # Bore: 30mm diameter through housing
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+    
+    # Mounting holes: 10mm diameter, 80mm apart
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 22, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```
+
+**Key change**: The fillet range starts at **5mm** (the specified value) and the edge filter uses a tighter Z range (4.9–5.1) to precisely target the junction circle. The mounting hole cylinders are extended to height 22mm to ensure they fully penetrate the 10mm base.

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/joosep/mistral-hackathon/vibecad/agent_iterations/iter_1.py", line 20, in <module>
+    profile = Face.make_from_wires(Wire.make_polygon([Vector(p[0], p[1], 0) for p in pts]))
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'Face' has no attribute 'make_from_wires'

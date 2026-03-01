@@ -1,0 +1,66 @@
+```python
+from build123d import *
+
+# --- Parameters ---
+flange_length = 50      # mm, each arm of the L
+flange_width  = 50      # mm, depth of the bracket (into the page)
+thickness     = 3       # mm, sheet metal thickness
+hole_dia      = 5       # mm, M4 clearance hole
+hole_inset    = 9       # mm, from outer edge (free end of flange)
+hole_pos1     = 12.5    # mm, along flange length
+hole_pos2     = 37.5    # mm, along flange length
+
+# --- 2D L-shaped profile (in XY plane) ---
+pts = [
+    (0, 0),
+    (flange_length, 0),
+    (flange_length, thickness),
+    (thickness, thickness),
+    (thickness, flange_length),
+    (0, flange_length),
+    (0, 0),  # close the loop
+]
+
+wire = Wire.make_polygon([Vector(p[0], p[1], 0) for p in pts])
+profile = make_face(wire)
+
+# Extrude along Z axis to give the bracket its depth
+bracket = extrude(profile, flange_width)
+
+# --- Mounting holes ---
+
+# Horizontal flange (Y=0 to Y=3mm, lies flat in XZ plane)
+# Drill through Y-axis (thickness direction), at Z=hole_inset from front face
+h_hole1 = (
+    Pos(hole_pos1, 0, hole_inset)
+    * Rot(90, 0, 0)
+    * Cylinder(hole_dia / 2, thickness * 2,
+               align=(Align.CENTER, Align.CENTER, Align.MIN))
+)
+h_hole2 = (
+    Pos(hole_pos2, 0, hole_inset)
+    * Rot(90, 0, 0)
+    * Cylinder(hole_dia / 2, thickness * 2,
+               align=(Align.CENTER, Align.CENTER, Align.MIN))
+)
+
+# Vertical flange (X=0 to X=3mm, stands upright in YZ plane)
+# Drill through X-axis (thickness direction), at Z=hole_inset from front face
+# Y position = flange_length - hole_inset (9mm from free top edge)
+v_hole1 = (
+    Pos(0, flange_length - hole_inset, hole_pos1)
+    * Rot(0, 90, 0)
+    * Cylinder(hole_dia / 2, thickness * 2,
+               align=(Align.CENTER, Align.CENTER, Align.MIN))
+)
+v_hole2 = (
+    Pos(0, flange_length - hole_inset, hole_pos2)
+    * Rot(0, 90, 0)
+    * Cylinder(hole_dia / 2, thickness * 2,
+               align=(Align.CENTER, Align.CENTER, Align.MIN))
+)
+
+bracket = bracket - [h_hole1, h_hole2, v_hole1, v_hole2]
+
+OBJ = bracket
+```

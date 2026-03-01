@@ -1,0 +1,39 @@
+## Comparison Analysis
+
+### What Changed
+The Z-position of the side walls was adjusted. In the **previous iteration**, the walls were positioned at:
+`z = thickness/2 + wall_height/2`
+
+In the **current iteration**, the Z position was changed to:
+`z = thickness + wall_height/2`
+
+### Visual Effect
+- The walls now sit correctly **on top of the base** rather than partially overlapping it
+- The front view now shows the bracket reaching exactly **40mm tall** (visible in the axis labels reaching ~40.0)
+- The overall U-shape looks properly proportioned and correctly assembled
+
+### Verification Against Goals
+✅ **40mm wide** - confirmed  
+✅ **40mm tall** - now correct, walls reach to 40mm  
+✅ **40mm deep** - confirmed  
+✅ **2mm thick material** - confirmed  
+✅ **10mm diameter hole in base center** - confirmed, visible in top and front views  
+
+---
+
+## Current Status: ✅ ON TRACK — Model is Complete!
+
+The U-bracket appears to meet **all the design requirements**. The geometry is correct and the hole is properly centered in the base.
+
+### Final Recommendation: Add Finishing Touches
+Add **chamfers or fillets** to the interior corners to make it more realistic and manufacturable:
+
+```python
+# Optional: fillet the interior bottom corners
+u_bracket = fillet(
+    u_bracket.edges().filter_by(Axis.Z),
+    radius=0.5
+)
+```
+
+This is a cosmetic step — **the model is functionally complete** as specified. Well done!

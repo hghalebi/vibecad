@@ -1,0 +1,30 @@
+```python
+from build123d import *
+
+with BuildPart() as pb:
+    # Base plate: 100x30x10mm, centered at origin (Z from -5 to +5)
+    Box(100, 30, 10)
+
+    # Cylindrical housing: OD=50mm (r=25), height=40mm
+    # Placed at Z=5 (top of base), growing upward
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # Fillet the circular edge where housing meets base top face (Z=+5)
+    fillet(
+        pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+            Axis.Z, 4.5, 5.5
+        ),
+        radius=5
+    )
+
+    # Central bore: 30mm diameter (r=15), through entire housing + base
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+    # Mounting holes: 10mm diameter (r=5), 80mm apart, through base
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 12, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```

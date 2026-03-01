@@ -1,0 +1,12 @@
+```python
+from build123d import *
+
+# Base flange: 100mm diameter, 10mm thick
+flange = Cylinder(radius=50, height=10)
+
+# Subtract central hole: 40mm diameter
+central_hole = Cylinder(radius=20, height=10)
+flange = flange - central_hole
+
+OBJ = flange
+```

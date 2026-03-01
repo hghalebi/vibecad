@@ -1,0 +1,1 @@
+design a circular flange with a 100mm diameter and 10mm thickness. It should have a central hole of 40mm diameter and four 10mm mounting holes equally spaced on a bolt circle of 80mm diameter.

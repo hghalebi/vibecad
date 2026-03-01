@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/joosep/mistral-hackathon/vibecad/agent_iterations/iter_12.py", line 71, in <module>
+    bracket.edges()
+  File "/home/joosep/miniconda3/envs/mistral/lib/python3.12/site-packages/build123d/topology/shape_core.py", line 2427, in __or__
+    return self.filter_by(filter_by)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/joosep/miniconda3/envs/mistral/lib/python3.12/site-packages/build123d/topology/shape_core.py", line 2605, in filter_by
+    raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
+ValueError: Unsupported filter_by predicate: [<build123d.topology.one_d.Edge object at 0x7f51535a8d70>, <build123d.topology.one_d.Edge object at 0x7f5152f86870>]

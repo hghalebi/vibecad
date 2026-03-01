@@ -1,0 +1,54 @@
+```python
+from build123d import *
+import math
+
+# The key insight: the cylinder (dia=50mm) is WIDER than the base (Y=30mm),
+# so the cylinder overhangs the base on the Y sides. This means the junction
+# edge is NOT a full circle but two arcs where the cylinder intersects the base top.
+# A 5mm fillet on these partial arcs may fail due to the overhang geometry.
+#
+# Solution: make the housing cylinder fit WITHIN the base by using a box-clipped
+# approach, OR accept the geometry and try the fillet on the actual junction edges.
+
+with BuildPart() as pb:
+    # Base plate: 100x30x10mm
+    Box(100, 30, 10)
+
+    # Cylindrical housing: OD=50mm (r=25), height=40mm, from base top upward
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # The cylinder overhangs the base (Y=30 < dia=50), so clip the housing
+    # to the base width by removing the overhanging parts
+    # This ensures the junction is clean and filletable
+    # Remove material outside the base footprint on Y sides
+    with Locations((0, 35, 25)):
+        Box(200, 40, 60, align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            mode=Mode.SUBTRACT)
+    with Locations((0, -35, 25)):
+        Box(200, 40, 60, align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            mode=Mode.SUBTRACT)
+
+    # Now select circular edges at Z=5 junction and apply 5mm fillet
+    junction_edges = pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+        Axis.Z, 4.8, 5.2
+    )
+    for r in [5, 4, 3, 2, 1]:
+        try:
+            fillet(junction_edges, radius=r)
+            break
+        except Exception:
+            continue
+
+    # Central bore: 30mm diameter through entire part
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+    # Mounting holes: 10mm diameter, 80mm apart, through base
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 22, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```

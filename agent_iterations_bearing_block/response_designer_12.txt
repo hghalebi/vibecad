@@ -1,0 +1,64 @@
+## Comparison Analysis
+
+### What Changed:
+The current iteration attempted to add fillets at the housing-base junction by using a **Cone primitive** as a blend shape. This is visible in the render as a **flared skirt/flange** at the base of the cylindrical housing - a tapered transition region rather than a proper rounded fillet.
+
+### Visual Assessment:
+- The cone blend created an **unintended flared lip** rather than a smooth concave fillet
+- The housing now looks like it has a mushroom/flange shape at the bottom - this is **incorrect geometry**
+- The bore and mounting holes still look correct
+- The overall proportions are reasonable but the junction treatment is wrong
+
+### Problems Identified:
+1. **Cone-based fillet is wrong** - produces a convex taper, not a concave fillet radius
+2. The housing-base transition should be a smooth **concave radius**, not a flare
+3. The approach of using primitives to fake fillets is causing geometry issues
+
+---
+
+## Next Step: Use build123d's Native Fillet Operation
+
+Abandon the cone approach entirely. Use `fillet()` on the **edges where the housing meets the top face of the base**. Here's the correct approach:
+
+```python
+from build123d import *
+
+# Base plate
+base = Box(100, 30, 10)
+
+# Housing cylinder - center at z=0 for build123d (centered by default)
+# Base top face is at z=5, housing should extend from z=5 to z=45
+# So housing center is at z=5+20=25 from world origin... 
+# but Box is centered at z=0, so base top = z=5
+# Cylinder centered, so translate center to z = 5 + 20 = 25
+
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# Union base and housing
+pillow_block = base + housing_outer
+
+# Now fillet the circular edges where housing meets base top face
+# These are the edges at z=5 on the cylindrical housing
+# Select edges at the junction height
+edges_to_fillet = pillow_block.edges().filter_by_position(
+    Axis.Z, 4.9, 5.1
+).filter_by(GeomType.CIRCLE)
+
+pillow_block = fillet(edges_to_fillet, radius=5)
+
+# Bore through housing
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# Mounting holes
+hole1 = Cylinder(5, 12).translate((40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```
+
+**Key points:**
+- Filter edges at `z ≈ 5` (top of base) that are circular
+- Apply `fillet(edges, radius=5)` natively
+- Do the fillet **before** subtracting the bore so geometry is cleaner

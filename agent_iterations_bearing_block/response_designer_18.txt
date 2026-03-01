@@ -1,0 +1,42 @@
+## Comparison Analysis
+
+### What Changed (PREVIOUS → CURRENT)
+The current iteration added two large box subtractions at Y=+35 and Y=-35 to create a "saddle" shape by cutting away material from both sides of the cylindrical housing. The fillet approach also changed - now filtering for circular edges (CIRCLE geometry type) at Z≈5.
+
+### Visual Effects
+- The cylindrical housing now has **flat vertical cutaways on both sides** (front and back), creating a U-channel/saddle appearance
+- The top view shows the cylinder with two rectangular notches cut from the Y+ and Y- faces
+- The fillets are **no longer visible** - the fillet attempt appears to have failed or been disrupted by the box subtractions
+
+### Critical Problems
+
+1. **Wrong geometry**: The goal specifies a **simple cylindrical housing** - not a saddle shape. The box subtractions are incorrect and should be removed entirely.
+
+2. **Fillets missing**: The 5mm fillets at the housing-base junction are not visible in the current render.
+
+3. **The PREVIOUS iteration was actually closer to correct** - it had a proper cylinder. The box subtractions in this iteration are a regression.
+
+## Recommended Action: Revert to Simple Cylinder + Fix Fillets
+
+Remove the two box subtraction operations entirely. Go back to the simpler approach:
+
+```python
+# After creating Box base and Cylinder housing,
+# find the circular edge at the base-cylinder junction (Z=5)
+# Use a straightforward fillet on that edge
+
+junction_edges = pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+    Axis.Z, 4.8, 5.2
+)
+fillet(junction_edges, radius=5)
+```
+
+The model needs:
+1. ✅ Rectangular base 100×30×10mm  
+2. ✅ Cylindrical housing OD=50mm, H=40mm (centered on base)
+3. ❌ Remove the box subtractions - **they are wrong**
+4. ❌ Fix 5mm fillets at housing-base junction
+5. ✅ Central bore 30mm diameter
+6. ✅ Two 10mm mounting holes at ±40mm
+
+**Delete the two box subtraction blocks and restore the fillet logic from the previous iteration.**

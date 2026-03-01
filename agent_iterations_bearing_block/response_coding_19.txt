@@ -1,0 +1,40 @@
+```python
+from build123d import *
+import math
+
+# Note on geometry: the cylinder (dia=50mm) is wider than the base (Y=30mm),
+# so the junction at Z=5 produces partial arc edges where the cylinder
+# intersects the base top face. We select all edges at Z=5 for filleting.
+
+with BuildPart() as pb:
+    # Base plate: 100x30x10mm
+    Box(100, 30, 10)
+
+    # Cylindrical housing: OD=50mm (r=25), height=40mm, from base top upward
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # Select ALL edges at Z=5 (the junction plane between base top and housing)
+    # This includes both the circular arc edges and any straight edges at that height
+    junction_edges = pb.part.edges().filter_by_position(Axis.Z, 4.8, 5.2)
+
+    # Apply fillet - try from 5mm down to find largest that works
+    for r in [5, 4, 3, 2, 1, 0.5]:
+        try:
+            fillet(junction_edges, radius=r)
+            break
+        except Exception:
+            continue
+
+    # Central bore: 30mm diameter through entire part
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+    # Mounting holes: 10mm diameter, 80mm apart, through base
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 22, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```

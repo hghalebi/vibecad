@@ -1,0 +1,29 @@
+```python
+from build123d import *
+
+# U-bracket dimensions
+width = 40    # X direction
+depth = 40    # Y direction
+height = 40   # Z direction
+thickness = 2 # material thickness
+
+wall_height = height - thickness  # 38mm so total height = 38 + 2 = 40mm
+
+# --- Base plate (bottom of the U) ---
+base = Box(width, depth, thickness)
+
+# --- Left wall ---
+left_wall = Pos(-width/2 + thickness/2, 0, thickness/2 + wall_height/2) * Box(thickness, depth, wall_height)
+
+# --- Right wall ---
+right_wall = Pos(width/2 - thickness/2, 0, thickness/2 + wall_height/2) * Box(thickness, depth, wall_height)
+
+# Combine into U-shape
+u_bracket = base + left_wall + right_wall
+
+# --- Hole in center of base (10mm diameter) ---
+hole = Cylinder(5, thickness * 3)  # radius=5 → 10mm dia, tall enough to pierce base
+u_bracket = u_bracket - hole
+
+OBJ = u_bracket
+```

@@ -1,0 +1,27 @@
+```python
+from build123d import *
+
+# --- Parameters ---
+flange_length = 50      # mm, each arm of the L
+flange_width  = 50      # mm, depth of the bracket (into the page)
+thickness     = 3       # mm, sheet metal thickness
+
+# --- 2D L-shaped profile (in XY plane) ---
+pts = [
+    (0, 0),
+    (flange_length, 0),
+    (flange_length, thickness),
+    (thickness, thickness),
+    (thickness, flange_length),
+    (0, flange_length),
+    (0, 0),  # close the loop
+]
+
+wire = Wire.make_polygon([Vector(p[0], p[1], 0) for p in pts])
+profile = make_face(wire)
+
+# Extrude along Z axis to give the bracket its depth
+bracket = extrude(profile, flange_width)
+
+OBJ = bracket
+```

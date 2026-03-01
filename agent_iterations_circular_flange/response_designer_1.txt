@@ -1,0 +1,35 @@
+## Iteration 1 Evaluation
+
+### Current State Assessment ✅
+The base cylinder is correctly formed with:
+- **Diameter**: 100mm (radius=50) ✓
+- **Thickness**: 10mm (height=10) ✓
+- **Positioning**: Centered on origin, lying flat on XY plane ✓
+
+The primary base shape is **correct and on track**. The cylinder appears clean and properly dimensioned as confirmed by the front and right views showing ~10mm height and the top view showing the full 100mm diameter circle.
+
+---
+
+## Next Step: Add the Central Hole (40mm diameter)
+
+The next logical step in CAD workflow is **subtractive operations** — specifically, bore the central hole through the flange.
+
+### Instructions for the Coding Agent:
+
+Subtract a **central cylinder** (hole) from the flange using a boolean subtraction:
+
+- Create a `Cylinder` with `radius=20` (40mm diameter), `height=10` (full thickness)
+- Use **subtraction** (`-` operator) to cut the hole from the flange body
+- The hole should be **centered on the Z-axis** (origin), which is the default position — no translation needed
+
+```python
+from build123d import *
+
+flange = Cylinder(radius=50, height=10)
+central_hole = Cylinder(radius=20, height=10)
+flange = flange - central_hole
+
+OBJ = flange
+```
+
+This will produce a **washer-like shape** — the annular ring that forms the flange body before the mounting holes are added. Verify in the top view that the central hole is concentric with the outer boundary.

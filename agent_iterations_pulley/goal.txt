@@ -1,0 +1,1 @@
+design a timing belt pulley. It has a central hub of 20mm diameter and 15mm height with an 8mm bore. The main body is 40mm diameter and 10mm height. Add two 45mm diameter flanges of 2mm thickness on both sides of the main body.
