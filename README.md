@@ -21,6 +21,14 @@ This script implements a sophisticated **Designer-Coder Multi-Agent Loop**. It e
     *   **Chain-of-Thought Guidance:** The Designer Agent provides technical critique (e.g., "Wall thickness is too low," "Add 5mm fillets here") and explicit instructions for the next step.
     *   **Completion Token:** The loop continues until the Designer issues a `[FINAL_MODEL_COMPLETE]` signal.
 *   **Data Yield:** High-fidelity multi-turn dialogues where every code change is preceded by expert reasoning and visual verification.
+*   **Artifacts (`agent_iterations_*/` folders):** Each successful run of the loop is stored in a dedicated folder (e.g., `agent_iterations_bearing_block`), containing:
+    *   `goal.txt`: The initial design specification.
+    *   `iter_N.py`: The full Python source for the N-th iteration.
+    *   `render_N.png`: Standardized 4-view render of the model at that step.
+    *   `response_designer_N.txt`: The VLM's visual analysis and corrective instructions.
+    *   `response_coding_N.txt`: The LLM's reasoning and code implementation for that step.
+    *   `prompt_*.json`: The complete JSON payloads sent to the models, useful for debugging and fine-tuning.
+    *   `error_N.txt`: Python tracebacks if an iteration failed to compile, capturing the "self-correction" process.
 
 ### 2. `data_generator_cot.py` — CoT-Enhanced Inverse Labeling
 Building on the inverse generation concept, this iteration focuses on the **internal reasoning** required to perform a mutation.
@@ -66,3 +74,25 @@ The foundational approach used pure programmatic generation to create volume.
 *   **Robust Selectors:** Data is filtered to ensure models use coordinate-based or topological selectors (e.g., `.faces().sort_by(Axis.Z)[-1]`) rather than volatile indices (`.faces()[5]`), ensuring edits are stable across geometry changes.
 *   **Multi-View Rendering:** Every example is validated using a standardized 4-view layout (Isometric, Front, Top, Right) with coordinate axes and grids, providing the VLM with the spatial context needed for accurate critique.
 *   **Geometric Verification:** Beyond visual checks, the pipeline uses `geometry_checker.py` to extract hard metrics (volume, surface area, bounding boxes) to verify that a "hole" actually removed material and a "fillet" actually modified edges.
+
+---
+
+## Next Steps: Fine-Tuning for Private Industrial CAD
+
+To enable fast, local, and private CAD editing suitable for sensitive industries like manufacturing and defense, the next phase of the project involves the following roadmap:
+
+### 1. Large-Scale Dataset Synthesis
+Scale the `cot_cad_loop.py` logic to generate 50,000+ multi-turn dialogues.
+*   **Progressive Complexity:** Categorize models into tiers (Simple, Intermediate, Advanced) to ensure the model learns foundational geometry before complex assemblies.
+*   **CoT Preservation:** Rigorously capture the `mutation_thought` and `label_thought` steps to ensure the fine-tuned model inherits the reasoning capabilities of the teacher models.
+
+### 2. Fine-Tuning for Local Execution
+Target a small, efficient LLM such as **Mistral Devstral 2** or **Mistral Nemo** to ensure low-latency performance on local hardware.
+*   **LoRA (Low-Rank Adaptation):** Employ LoRA to train a compact adapter. This allows for rapid model iteration and easy deployment of specialized "CAD Engineer" modules without the overhead of full model weights.
+*   **Visual-Text Alignment:** Utilize the 4-view renders as grounding tokens during fine-tuning to improve the model's spatial reasoning and visual-to-code mapping.
+
+### 3. Deployment in Sensitive Environments
+The resulting compact adapter will be optimized for:
+*   **Air-Gapped Operation:** Full functionality without external API dependencies.
+*   **Hardware Efficiency:** Running on standard industrial workstations with consumer-grade GPUs.
+*   **Reality-Constrained Editing:** A model that doesn't just "hallucinate" code, but understands the physical constraints of manufacturing processes.
