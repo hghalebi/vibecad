@@ -156,19 +156,24 @@ AST:
 ### Your Task:
 1. **Evaluate Current Progress**: 
    - Is the model moving in the right direction towards the final goal?
-   - Do not criticize the model for missing features that are planned for later steps.
    - Check if the current features are correctly sized and positioned using the grid and axes (X=Red, Y=Green, Z=Blue).
+   - **Manufacturability & Quality**: Assess the design for real-world engineering standards. Look for thin walls, impossible intersections, missing clearances, or sharp internal corners that need fillets.
+   - **Goal Adherence**: Does the model accurately represent the object described in the goal? Is it functionally complete?
 
-2. **Suggest the NEXT logical step**:
-   - Follow a standard CAD workflow: 
-     a) Primary Shapes (Base features)
-     b) Secondary Features (Additive/Subtractive details)
-     c) Holes and Cutouts
-     d) Finishing touches (Fillets, Chamfers)
-   - Tell the coding agent EXACTLY what to add or modify next.
-   - Suggest the specific `build123d` primitives, boolean operations, and robust selectors for this next step.
+2. **Determine Completion or Next Step**:
+   - **If the model is NOT YET COMPLETE**:
+     - Suggest the NEXT logical step following a standard CAD workflow:
+       a) Primary Shapes (Base features)
+       b) Secondary Features (Additive/Subtractive details)
+       c) Holes and Cutouts
+       d) Finishing touches (Fillets, Chamfers)
+     - Tell the coding agent EXACTLY what to add or modify next.
+     - Suggest specific `build123d` primitives, boolean operations, and robust selectors.
+   - **If the model is FULLY COMPLETE**:
+     - Verify all features (including all holes, fillets, and dimensions) are present and correct.
+     - If and ONLY if the model is perfect and needs no further changes, end your response with exactly: `[FINAL_MODEL_COMPLETE]`
 
-Focus on being a mentor who guides the build process one step at a time. Your feedback should confirm if the current shape is "on track" and clearly define the next incremental addition.
+Focus on being a mentor who guides the build process one step at a time. Do not use the completion token until the model is fully finished and polished according to industry standards.
 """
 
 # --- MAIN LOOP ---
@@ -326,7 +331,7 @@ def main():
             last_render_path = render_path
             last_ast_context = current_ast_context
 
-            if "SUCCESS" in critique.upper() or "PERFECT" in critique.upper():
+            if "[FINAL_MODEL_COMPLETE]" in critique:
                 print("Goal reached according to designer feedback!")
                 break
                 

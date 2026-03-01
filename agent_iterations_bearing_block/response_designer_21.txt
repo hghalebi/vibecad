@@ -1,0 +1,64 @@
+## Comparison Analysis
+
+### What Changed:
+The current iteration switched from a `BuildPart` context manager approach to a direct algebraic boolean approach. The code now uses `Box + Cylinder - bore - holes` style operations outside of a build context.
+
+### Visual Differences:
+1. **Housing cylinder is now FULL (not clipped)** - The previous iteration had the housing trimmed at the front and back (flat walls visible on front view), giving it a proper pillow block look. The current version shows a **complete, uncut cylinder** - the two subtraction boxes that created the flat faces on the housing are gone.
+2. **The housing appears taller/more prominent** - The cylinder is centered at Z=25 with height 40, so it spans Z=5 to Z=45, which is correct, but the housing looks different visually.
+3. **The bore appears correct** - 30mm diameter bore through the housing.
+4. **Mounting holes appear correct** - Two 10mm holes at ±40mm.
+
+### Critical Issues:
+
+**The housing is a full cylinder** - In a proper pillow block bearing, the cylindrical housing should be a complete cylinder (this is actually correct for a pillow block!). But looking at the **previous iteration**, the front/back material was subtracted, making it look like a C-shape. Actually, the **current full cylinder is more correct** for a pillow block housing.
+
+### Remaining Issues:
+
+1. **Missing fillets at housing-base junction** - The fillet code is trying to use `.fillet()` method on a non-BuildPart object, which likely failed silently. The junction between the cylinder and base should have 5mm fillets.
+2. **The bore cylinder placement** - It's translated to Z=20 with height 56, so it spans from Z=-8 to Z=48, which should work. But using `BuildPart` context would be more reliable.
+
+### Recommendation:
+
+Revert to the **BuildPart context manager** approach (which was working in the previous iteration) but **remove the two subtraction boxes** that were incorrectly clipping the housing cylinder. The previous approach had fillets working correctly.
+
+Here's the corrected approach:
+
+```python
+from build123d import *
+
+with BuildPart() as pb:
+    # Base plate
+    Box(100, 30, 10)
+    
+    # Cylindrical housing centered on base top
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    
+    # Apply 5mm fillets at housing-base junction (Z=5 interface)
+    junction_edges = pb.part.edges().filter_by_position(
+        Axis.Z, 4.8, 5.2
+    )
+    for r in [5, 4, 3, 2, 1, 0.5]:
+        try:
+            fillet(junction_edges, radius=r)
+            break
+        except Exception:
+            continue
+    
+    # Central bore (30mm diameter, through full height)
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, 
+                 align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+    
+    # Mounting holes (10mm diameter, 80mm apart)
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 22,
+                 align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```
+
+The key fix is **removing the two Box subtractions** that were cutting the front and back of the housing - those don't belong in a pillow block design. The current cylinder shape is actually correct! The main remaining issue is getting the **5mm fillets** to apply properly at the housing-base junction.

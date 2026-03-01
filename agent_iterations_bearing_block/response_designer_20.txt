@@ -1,0 +1,35 @@
+## Comparison Analysis
+
+### What Changed
+The current iteration added two large box subtractions (200×10×60mm) at Y=+20 and Y=-20, which were intended to create the fillet effect at the cylinder-base junction. However, this has gone badly wrong:
+
+1. **The cylinder is no longer round** - The front and top views show the cylindrical housing has been cut into a roughly rectangular/U-shape. The outer walls of the cylinder have been sliced off.
+2. **The fillets are gone** - The smooth junction between cylinder and base from the previous iteration has been destroyed.
+3. **The model is regressing** - The previous iteration (Iteration 20) was actually **very close to correct** with a proper round cylinder, central bore, and mounting holes.
+
+### What Was Lost
+The previous model had:
+- ✅ Correct rectangular base (100×30×10mm)
+- ✅ Proper round cylindrical housing (OD=50mm, H=40mm)
+- ✅ Central bore (30mm diameter)
+- ✅ Mounting holes (10mm diameter, 80mm apart)
+- ⚠️ Small fillet attempt at junction
+
+## Recommendation: **REVERT** to the previous approach
+
+The box subtractions were a misguided attempt and must be **completely removed**. Go back to the previous working code and simply apply the fillet correctly.
+
+### Next Step: Clean Fillet Application
+
+Remove the two box subtractions entirely. Use this approach for the 5mm fillet:
+
+```python
+# After building base + cylinder + bore + mounting holes,
+# select edges at Z=5 (top of base / bottom of cylinder junction)
+junction_edges = pb.part.edges().filter_by_position(
+    Axis.Z, 4.8, 5.2
+)
+fillet(junction_edges, radius=5)
+```
+
+The previous iteration's fillet logic was correct in concept - just ensure the edge selection at Z≈5 captures the circular edge where the cylinder meets the base top face. Do NOT add any box subtractions.

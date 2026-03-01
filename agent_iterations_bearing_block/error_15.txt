@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/home/joosep/miniconda3/envs/mistral/lib/python3.12/site-packages/build123d/topology/three_d.py", line 347, in fillet
+    raise Standard_Failure
+OCP.OCP.Standard.Standard_Failure
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/joosep/mistral-hackathon/vibecad/agent_iterations_bearing_block/iter_15.py", line 13, in <module>
+    fillet(
+  File "/home/joosep/miniconda3/envs/mistral/lib/python3.12/site-packages/build123d/operations_generic.py", line 439, in fillet
+    new_part = target.fillet(radius, list(object_list))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/joosep/miniconda3/envs/mistral/lib/python3.12/site-packages/build123d/topology/three_d.py", line 349, in fillet
+    raise ValueError(
+ValueError: Failed creating a fillet with radius of 5, try a smaller value or use max_fillet() to find the largest valid fillet radius

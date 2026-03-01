@@ -1,0 +1,1 @@
+design a simple U-bracket. It should be 40mm wide, 40mm tall, and 40mm deep, made from 2mm thick material. Add a 10mm hole in the center of the base.

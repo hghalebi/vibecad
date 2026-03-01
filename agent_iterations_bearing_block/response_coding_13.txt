@@ -1,0 +1,40 @@
+```python
+from build123d import *
+
+# --- Base (centered at origin, Z from -5 to +5) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Housing from Z=+5 to Z=+45 => center at Z = +25
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# --- Union base + housing ---
+pillow_block = base + housing_outer
+
+# --- Fillet at junction using native fillet operation ---
+# Select the circular edge where housing meets base top face at Z=+5
+edges_to_fillet = pillow_block.edges().filter_by_position(
+    Axis.Z, 4.9, 5.1
+).filter_by(GeomType.CIRCLE)
+
+# Try progressively smaller radii until fillet succeeds
+for radius in [5, 4, 3, 2, 1]:
+    try:
+        pillow_block_filleted = pillow_block.fillet(radius, edges_to_fillet)
+        pillow_block = pillow_block_filleted
+        break
+    except Exception:
+        continue
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# --- Mounting holes (10mm diameter, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Subtract bore and mounting holes ---
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```

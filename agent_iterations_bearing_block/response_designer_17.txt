@@ -1,0 +1,43 @@
+## Comparison Analysis
+
+### Visual Differences Between Previous and Current
+The two renders look nearly identical at first glance. The key structural change in the AST is:
+
+1. **Mounting hole cylinder height changed**: From `Cylinder(5, 12)` to `Cylinder(5, 22)` - the mounting hole subtraction cylinders are now 22mm tall instead of 12mm.
+
+2. **Fillet approach updated**: The edge filtering changed from `filter_by(GeomType.CIRCLE).filter_by_position(Z, 4.5, 5.5)` to `filter_by_position(Z, 4.9, 5.1)` (tighter Z range), plus a more sophisticated `max_fillet` approach.
+
+### Effect on Model
+The mounting holes now go through the full 10mm base (starting at z=-6, height=22mm covers z=-6 to z=+16, well past the top of the base at z=+10). This is **correct** - the holes properly penetrate the base.
+
+### Verifying Against Goal
+
+Let me check all requirements:
+
+| Feature | Goal | Status |
+|---|---|---|
+| Base | 100×30×10mm | ✅ |
+| Mounting holes | 10mm dia, 80mm apart | ✅ |
+| Cylindrical housing | OD 50mm, height 40mm | ✅ |
+| Central bore | 30mm dia | ✅ |
+| Fillets at junction | 5mm | ⚠️ **Only ~2mm visible** |
+
+### Primary Issue: Fillet Radius
+Looking at the Right view, the fillet at the cylinder-base junction appears small (roughly 1-2mm), not the **5mm** specified in the goal. The `min(max_r * 0.9, 5.0)` logic should theoretically allow 5mm, but the geometry may be constraining it.
+
+### Next Step: Force 5mm Fillet
+
+The 5mm fillet needs to be explicitly applied. The junction between the 50mm OD cylinder and the 10mm base top face has sufficient geometry. Try selecting edges more robustly and applying exactly 5mm:
+
+```python
+# After building the cylinder, before boring:
+# Select the circular edges at Z=5 (top of base / bottom of cylinder junction)
+junction_edges = pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+    Axis.Z, 4.8, 5.2
+)
+fillet(junction_edges, radius=5)
+```
+
+The key fix: **use `filter_by(GeomType.CIRCLE)` first** to limit to circular edges, then `filter_by_position` by Z. This should isolate exactly the two concentric circular edges at the cylinder-base interface and allow the full 5mm fillet to be applied cleanly.
+
+Also verify: the bore subtraction cylinder height of 52mm (starting at z=-6) seems excessive — it only needs ~56mm total to clear both faces, so that's fine.

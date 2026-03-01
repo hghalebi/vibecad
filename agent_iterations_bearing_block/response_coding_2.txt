@@ -1,0 +1,37 @@
+```python
+from build123d import *
+
+# --- Base (centered at origin, Z from -5 to +5) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Housing outer diameter = 50mm (radius=25), height = 40mm
+# Should rise from base bottom (Z=-5) to Z=+35
+# Cylinder is centered by default, so center at Z = (-5 + 35) / 2 = +15
+# But we want it to sit ON TOP of the base, starting at Z=+5
+# Housing from Z=+5 to Z=+45 => center at Z = (5+45)/2 = +25
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# --- Union base + housing FIRST, then fillet the junction ---
+pillow_block = base + housing_outer
+
+# --- Fillet at the junction where housing meets base top (Z = +5) ---
+# The circular edge at Z=+5 is where the cylinder base meets the top of the base plate
+junction_edges = pillow_block.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+    Axis.Z, 4.5, 5.5
+)
+pillow_block = pillow_block.fillet(5, junction_edges)
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+# Bore must go through entire housing + base: from Z=-6 to Z=+46
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# --- Mounting holes (10mm diameter, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Subtract bore and mounting holes ---
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```

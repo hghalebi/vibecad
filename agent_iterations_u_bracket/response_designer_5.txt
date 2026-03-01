@@ -1,0 +1,34 @@
+## Comparison Analysis
+
+### Visual Differences
+The CURRENT and PREVIOUS renders are **virtually identical**. The only change in the AST is the **removal of the fillet operation** that was present in the previous iteration. The fillet step has been dropped, resulting in the same sharp-edged U-bracket geometry.
+
+### Effect of Code Changes
+- The `u_bracket.fillet(0.5, u_bracket.edges() | Axis.Z)` call was removed
+- This was likely removed due to an error with the fillet selector syntax
+- The core geometry (base + walls + hole) remains correct and well-formed
+
+---
+
+## Current State Evaluation ✅
+
+The model is **on track** and nearly complete:
+- ✅ 40mm × 40mm × 40mm overall envelope
+- ✅ 2mm thick material throughout
+- ✅ Base plate centered at origin
+- ✅ Left and right walls correctly positioned
+- ✅ 10mm diameter hole (5mm radius) in center of base
+- ⬜ Finishing fillets (optional polish)
+
+---
+
+## Next Step: Add Finishing Fillets
+
+The model is functionally complete. Add subtle fillets to soften sharp edges for a more realistic manufactured look. Use a **simpler, safer selector** this time:
+
+```python
+# Fillet all edges with a small radius
+u_bracket = u_bracket.fillet(0.5, u_bracket.edges())
+```
+
+This applies a uniform 0.5mm fillet to **all edges** without complex selectors, which should execute without errors and give the bracket a clean, professional finish.

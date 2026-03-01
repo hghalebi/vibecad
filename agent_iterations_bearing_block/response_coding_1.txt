@@ -1,0 +1,74 @@
+I'll build this incrementally, starting with the base, then adding the cylindrical housing, then the bore, and finally the fillets.
+
+**Step 1: Base + Cylindrical Housing + Bore**
+
+```python
+from build123d import *
+
+# --- Base ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing (centered on base, rising from bottom) ---
+# Housing outer diameter = 50mm, total height from base bottom = 40mm
+# So housing extends 30mm above the base top (base is 10mm tall)
+housing_outer = Cylinder(25, 40)  # radius=25, height=40
+# Move housing so its bottom aligns with base bottom (Z=0 in centered coords)
+# Box is centered at origin: Z goes from -5 to +5
+# Cylinder centered at origin: Z goes from -20 to +20
+# We want cylinder bottom at Z=-5, so shift up by 15
+housing_outer = housing_outer.translate((0, 0, 15))
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+bore = Cylinder(15, 42)  # slightly taller to ensure clean cut
+bore = bore.translate((0, 0, 15))
+
+# --- Mounting holes (10mm diameter = 5mm radius, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate((40, 0, 0))   # +40mm from center
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))  # -40mm from center
+
+# --- Combine ---
+pillow_block = base + housing_outer - bore - hole1 - hole2
+
+OBJ = pillow_block
+```
+
+Let me verify the geometry and add the fillets at the housing-base junction:
+
+```python
+from build123d import *
+
+# --- Base (100 x 30 x 10 mm, centered at origin) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Outer radius = 25mm, total height = 40mm from base bottom
+# Base bottom is at Z = -5, base top at Z = +5
+# Housing bottom at Z = -5 → center at Z = -5 + 20 = +15
+housing_outer = Cylinder(25, 40).translate((0, 0, 15))
+
+# --- Central Bore (30mm dia = 15mm radius, through full height) ---
+bore = Cylinder(15, 42).translate((0, 0, 15))
+
+# --- Mounting Holes (10mm dia, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Boolean combine ---
+pillow_block = base + housing_outer - bore - hole1 - hole2
+
+# --- Fillets at housing-base junction ---
+# Select edges at the base of the housing (circular edges near Z = +5, top of base)
+# These are the edges where the cylinder meets the top face of the base
+fillet_edges = pillow_block.edges().filter_by_position(Axis.Z, 4.9, 5.1)
+
+pillow_block = pillow_block.fillet(5, fillet_edges)
+
+OBJ = pillow_block
+```
+
+**What's been built:**
+- ✅ **Base**: 100×30×10 mm rectangular block, centered at origin
+- ✅ **Housing**: 50mm OD cylinder, 40mm tall from base bottom (30mm proud above base)
+- ✅ **Bore**: 30mm diameter central through-hole for the bearing
+- ✅ **Mounting holes**: 10mm diameter, 80mm apart (±40mm from center), through the base
+- ✅ **Fillets**: 5mm radius where the cylindrical housing meets the top of the base

@@ -1,0 +1,33 @@
+## Comparison Analysis
+
+### What Changed Between Iterations:
+The current iteration **removed the two side-trimming box subtractions** that were previously cutting the cylindrical housing flush with the base edges (Y-direction). In the previous iteration, those boxes at Y=±35 were trimming the cylinder to not protrude beyond the 30mm base width. Now the full cylinder (OD=50mm) extends well beyond the 30mm base in the Y-direction.
+
+### Visual Effect:
+- **Previous**: The housing was trimmed to fit within the base width, creating flat faces on the sides — this looked wrong for a pillow block bearing (too aggressive trimming)
+- **Current**: The full cylinder is visible, but it now **massively overhangs** the 30mm base in the Y-direction. The cylinder (OD=50mm, radius=25mm) extends ±25mm in Y, while the base is only 30mm wide (±15mm). This is **geometrically incorrect** for a real pillow block bearing housing.
+
+### Problems Identified:
+1. **Cylinder overhangs base**: The 50mm OD cylinder extends 10mm beyond each side of the 30mm base - this is not manufacturable or realistic
+2. **Fillet edge selection changed**: The filter was simplified (removed `filter_by(GeomType.CIRCLE)`) - the fillets appear to have applied at the base of the cylinder correctly based on the render
+3. **The fillet looks good** at the cylinder-base junction in the current render
+
+### What Needs to Be Fixed:
+
+The cylindrical housing should be **trimmed/intersected** with the base width in Y. A pillow block housing realistically has the cylinder sitting proud of the base but **not wider than the base in Y**. The housing OD (50mm) exceeds the base width (30mm), so we need to clip the cylinder sides.
+
+**Next Step**: Re-add the side-trimming subtractions, but use correct dimensions. The base is 30mm wide (Y), so trim at Y=±15mm using subtract boxes:
+
+```python
+# Trim cylinder sides to match base width
+with Locations((0, 20, 25)):
+    Box(200, 10, 60, 
+        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+        mode=Mode.SUBTRACT)
+with Locations((0, -20, 25)):
+    Box(200, 10, 60,
+        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+        mode=Mode.SUBTRACT)
+```
+
+The trim boxes should start at Y=±15 (base edge). Place them centered at Y=±(15+5)=±20 with width 10mm to cleanly trim the overhanging cylinder material flush with the base sides.

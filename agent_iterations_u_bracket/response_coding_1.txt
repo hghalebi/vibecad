@@ -1,0 +1,41 @@
+I'll build this U-bracket incrementally. Let me start with the basic U-shape by creating the three panels (two sides and a base), then add the hole.
+
+**Step 1: Base plate + two side walls forming the U-shape**
+
+```python
+from build123d import *
+
+# U-bracket dimensions
+width = 40    # X direction
+depth = 40    # Y direction
+height = 40   # Z direction
+thickness = 2 # material thickness
+
+# --- Base plate (bottom of the U) ---
+base = Box(width, depth, thickness)
+# Center it at Z=0, so it spans Z = -1 to +1
+
+# --- Left wall ---
+# Sits on top of base left edge, goes up
+left_wall = Pos(-width/2 + thickness/2, 0, thickness/2 + height/2) * Box(thickness, depth, height)
+
+# --- Right wall ---
+right_wall = Pos(width/2 - thickness/2, 0, thickness/2 + height/2) * Box(thickness, depth, height)
+
+# Combine into U-shape
+u_bracket = base + left_wall + right_wall
+
+# --- Hole in center of base (10mm diameter) ---
+hole = Pos(0, 0, 0) * Cylinder(5, thickness * 3)  # radius=5 → 10mm dia, tall enough to pierce base
+u_bracket = u_bracket - hole
+
+OBJ = u_bracket
+```
+
+**What's been built:**
+- ✅ **Base plate**: 40×40mm, 2mm thick, centered at origin
+- ✅ **Left wall**: 2mm thick, 40mm tall, full 40mm depth
+- ✅ **Right wall**: mirror of left wall
+- ✅ **10mm hole**: centered in the base plate
+
+The U opens **upward** (+Z direction). The bracket sits with its base at Z=−1 to Z=+1, and the walls extend up to Z=41. Let me know if you'd like to adjust orientation, add mounting holes, fillets, or any other features!

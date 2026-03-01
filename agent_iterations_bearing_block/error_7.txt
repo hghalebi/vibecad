@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/joosep/mistral-hackathon/vibecad/agent_iterations_bearing_block/iter_7.py", line 35, in <module>
+    profile_face = Face.make_from_wires(profile_wire)
+                   ^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'Face' has no attribute 'make_from_wires'

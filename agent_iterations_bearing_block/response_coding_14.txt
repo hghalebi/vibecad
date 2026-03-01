@@ -1,0 +1,52 @@
+```python
+from build123d import *
+import math
+
+# --- Base (centered at origin, Z from -5 to +5) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Housing from Z=+5 to Z=+45 => center at Z = +25
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# --- Union base + housing ---
+pillow_block = base + housing_outer
+
+# --- Fillet at junction using edge length + Z-position filtering ---
+# The circular edge where housing meets base top has:
+#   circumference = 2 * pi * 25 ≈ 157.08 mm
+#   center Z ≈ +5 (top of base)
+target_circumference = 2 * math.pi * 25
+
+for fillet_r in [5, 4, 3, 2, 1]:
+    try:
+        candidate_edges = [
+            e for e in pillow_block.edges()
+            if abs(e.length - target_circumference) < 10
+            and abs(e.center().Z - 5) < 1.0
+        ]
+        if candidate_edges:
+            pillow_block = pillow_block.fillet(fillet_r, candidate_edges)
+            print(f"Fillet applied with radius {fillet_r}mm")
+            break
+        else:
+            print("No candidate edges found, checking all edges...")
+            # Debug: print edge info
+            for e in pillow_block.edges():
+                print(f"  Edge: length={e.length:.2f}, center_Z={e.center().Z:.2f}")
+    except Exception as ex:
+        print(f"Fillet radius {fillet_r} failed: {ex}")
+        continue
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# --- Mounting holes (10mm diameter, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Subtract bore and mounting holes ---
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```

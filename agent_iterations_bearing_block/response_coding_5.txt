@@ -1,0 +1,55 @@
+```python
+from build123d import *
+
+# --- Base (centered at origin, Z from -5 to +5) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Housing from Z=+5 to Z=+45 => center at Z = +25
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# --- Union base + housing ---
+pillow_block = base + housing_outer
+
+# --- Manual fillet blend using a revolved quarter-circle profile ---
+# Fillet fills the concave corner between base top (Z=+5) and cylinder side (r=25)
+fillet_r = 5  # 5mm fillet radius
+
+# Build the quarter-circle profile in the XZ plane
+# Arc center at (25 + fillet_r, 0, 5 + fillet_r) = (30, 0, 10)
+# The profile is a small filled region: a quarter-circle wedge
+# Points: (25, 0, 5+fillet_r), (25+fillet_r, 0, 5), arc between them
+p1 = Vector(25, 0, 5 + fillet_r)           # on cylinder wall
+p2 = Vector(25 + fillet_r, 0, 5)           # on base top
+arc_center = Vector(25 + fillet_r, 0, 5 + fillet_r)
+
+# Create the fillet profile as a closed wire in XZ plane
+arc = Edge.make_tangent_arc(p1, Vector(1, 0, -1).normalized(), p2)
+line1 = Edge.make_line(p2, arc_center)
+line2 = Edge.make_line(arc_center, p1)
+line3 = Edge.make_line(Vector(25, 0, 5), p1)
+
+# Close the profile: arc + line from p2 to arc_center + line from arc_center to p1
+profile_wire = Wire.make_wire([arc, 
+                                Edge.make_line(p2, arc_center),
+                                Edge.make_line(arc_center, p1)])
+profile_face = Face.make_from_wires(profile_wire)
+
+# Revolve 360 degrees around Z axis to create the fillet solid
+fillet_solid = revolve(profile_face, Axis.Z, 360)
+
+# Add fillet blend to pillow block
+pillow_block = pillow_block + fillet_solid
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# --- Mounting holes (10mm diameter, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Subtract bore and mounting holes ---
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```

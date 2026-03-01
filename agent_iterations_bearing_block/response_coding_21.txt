@@ -1,0 +1,44 @@
+```python
+from build123d import *
+
+# Build the pillow block bearing house using algebraic API
+# Base: 100x30x10mm centered at origin (Z: -5 to +5)
+# Housing: OD=50mm, H=40mm, sitting on top of base (Z: +5 to +45)
+# Bore: 30mm diameter through housing and base
+# Mounting holes: 10mm diameter, 80mm apart (at X=±40mm)
+
+# Step 1: Base plate
+base = Box(100, 30, 10)
+
+# Step 2: Cylindrical housing on top of base
+housing = Cylinder(25, 40).translate((0, 0, 25))
+
+# Step 3: Union
+pillow_block = base + housing
+
+# Step 4: Apply fillet at junction (Z=+5) before subtractions
+# Select edges at the junction plane between base top and housing bottom
+junction_edges = pillow_block.edges().filter_by_position(Axis.Z, 4.8, 5.2)
+
+# Apply the largest fillet that succeeds
+for r in [5, 4, 3, 2, 1, 0.5]:
+    try:
+        pillow_block = pillow_block.fillet(r, junction_edges)
+        break
+    except Exception:
+        # Re-select edges after failed attempt (object unchanged)
+        junction_edges = pillow_block.edges().filter_by_position(Axis.Z, 4.8, 5.2)
+        continue
+
+# Step 5: Central bore - 30mm diameter through full height
+bore = Cylinder(15, 56).translate((0, 0, 20))
+
+# Step 6: Mounting holes - 10mm diameter, through base, at X=±40mm
+hole1 = Cylinder(5, 22).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 22).translate((-40, 0, 0))
+
+# Step 7: Subtract bore and holes
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```

@@ -1,0 +1,33 @@
+I'll build this L-shaped angle bracket incrementally. Let me start with the basic L-shaped 2D profile and extrude it.
+
+**Step 1: L-shaped profile + extrusion**
+
+```python
+from build123d import *
+
+# --- Parameters ---
+flange_length = 50      # mm, each arm of the L
+flange_width  = 50      # mm, depth of the bracket (into the page)
+thickness     = 3       # mm, sheet metal thickness
+
+# --- 2D L-shaped profile (in XZ plane) ---
+# The L sits with its corner at the origin
+# Outer points go to (50,0), (50,3), (3,3), (3,50), (0,50), (0,0)
+pts = [
+    (0, 0),
+    (flange_length, 0),
+    (flange_length, thickness),
+    (thickness, thickness),
+    (thickness, flange_length),
+    (0, flange_length),
+]
+
+profile = Face.make_from_wires(Wire.make_polygon([Vector(p[0], p[1], 0) for p in pts]))
+
+# Extrude along Y axis to give the bracket its depth
+bracket = extrude(profile, flange_width)
+
+OBJ = bracket
+```
+
+The L-profile is created and extruded to 50 mm depth. Next step will add the mounting holes. Let me know if the basic shape looks correct before proceeding!

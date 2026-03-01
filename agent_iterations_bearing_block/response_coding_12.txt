@@ -1,0 +1,48 @@
+The error indicates that `OBJ` is a `ShapeList` (multiple solids) rather than a single `Solid`. The boolean operations are producing disconnected solids. Let me simplify the approach and avoid the torus fillet entirely, using a clean swept profile instead, and ensure everything fuses into one solid.
+
+```python
+from build123d import *
+import math
+
+# --- Base (centered at origin, Z from -5 to +5) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Housing from Z=+5 to Z=+45 => center at Z = +25
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# --- Union base + housing as a single solid ---
+pillow_block = base + housing_outer
+
+# --- Fillet approximation: add a chamfer-like ring at the junction ---
+# Use a truncated cone (frustum) to blend the cylinder into the base
+# This sits at Z=5 (base top), transitions from r=25+fillet_r to r=25 over fillet_r height
+fillet_r = 5
+
+# Cone frustum: bottom radius = 25+fillet_r, top radius = 25, height = fillet_r
+# Positioned so bottom is at Z=5, top at Z=5+fillet_r
+cone_blend = Cone(25 + fillet_r, 25, fillet_r).translate((0, 0, 5 + fillet_r / 2))
+
+pillow_block = pillow_block + cone_blend
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# --- Mounting holes (10mm diameter, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Subtract bore and mounting holes ---
+pillow_block = pillow_block - bore - hole1 - hole2
+
+# --- Ensure single solid output ---
+all_solids = pillow_block.solids()
+if len(all_solids) == 1:
+    OBJ = all_solids[0]
+else:
+    # Fuse all solids into one
+    merged = all_solids[0]
+    for s in all_solids[1:]:
+        merged = merged + s
+    OBJ = merged.solids()[0]
+```

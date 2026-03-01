@@ -1,0 +1,37 @@
+The fillet on the outer circular edge at Z=5 keeps failing because the base is only 10mm wide (Y=30mm) and the cylinder radius is 25mm — the cylinder is wider than the base, so the junction edge is partially "in the air" and the fillet geometry is invalid. Let me use `max_fillet()` to find the correct radius, and also try filleting the inner edge instead.
+
+```python
+from build123d import *
+
+with BuildPart() as pb:
+    # Base plate: 100x30x10mm, centered at origin (Z from -5 to +5)
+    Box(100, 30, 10)
+
+    # Cylindrical housing: OD=50mm (r=25), height=40mm
+    # Placed at Z=5 (top of base), growing upward
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # Find and fillet the circular edges at the housing-base junction
+    # The cylinder (r=25) is wider than the base (Y=30), so the junction
+    # is a partial arc — try small radii to find what works
+    junction_edges = pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+        Axis.Z, 4.5, 5.5
+    )
+    for r in [2, 1.5, 1, 0.5]:
+        try:
+            fillet(junction_edges, radius=r)
+            break
+        except Exception:
+            continue
+
+    # Central bore: 30mm diameter (r=15), through entire housing + base
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+    # Mounting holes: 10mm diameter (r=5), 80mm apart, through base
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 12, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```

@@ -1,0 +1,60 @@
+The fillet on the circular junction edge keeps failing. Let me try a different approach — instead of filleting the circular edge at the junction, I'll use a torus-shaped solid to simulate the fillet, or better yet, use a chamfer instead. Actually, let me try selecting edges differently and use a very small radius first, then try an alternative approach using `add` with a blending torus.
+
+The most robust approach is to create the fillet geometry manually using a revolved profile that acts as a blend between the cylinder and the base.
+
+```python
+from build123d import *
+
+# --- Base (centered at origin, Z from -5 to +5) ---
+base = Box(100, 30, 10)
+
+# --- Cylindrical Housing ---
+# Housing from Z=+5 to Z=+45 => center at Z = +25
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# --- Union base + housing ---
+pillow_block = base + housing_outer
+
+# --- Manual fillet blend at junction using a swept torus quarter-circle profile ---
+# Create a quarter-circle fillet profile revolved 360 degrees
+# The fillet sits at the base of the cylinder (radius=25) at Z=+5
+# It fills the concave corner between the flat base top and the cylinder side
+fillet_r = 5  # 5mm fillet radius
+
+# Quarter circle profile: center of arc at (25+fillet_r, 0, 5+fillet_r) = (30, 0, 10)
+# Arc goes from (30, 0, 5) to (25, 0, 10) — filling the corner
+fillet_profile = (
+    Circle(fillet_r, plane=Plane.XZ)
+    .translate((25 + fillet_r, 0, 5 + fillet_r))
+)
+
+# Make it a face and revolve
+fillet_face = make_face(fillet_profile)
+
+# We want the solid quarter that fills the concave corner
+# Revolve the face 360 degrees around Z axis
+fillet_torus = revolve(fillet_face, Axis.Z, 360)
+
+# Subtract the quarter-circle solid from the torus to get just the fillet material
+# The fillet material is the torus minus the cylinder and minus the half-space above Z=5
+inner_cyl = Cylinder(25 + fillet_r, 20).translate((0, 0, 5 + 10))
+above_plane = Box(200, 200, 20).translate((0, 0, 5 + 10))
+outer_cyl_cut = Cylinder(25, 20).translate((0, 0, 5 + 10))
+
+fillet_solid = fillet_torus - above_plane - outer_cyl_cut
+
+# Add fillet blend to pillow block
+pillow_block = pillow_block + fillet_solid
+
+# --- Central bore (30mm diameter = 15mm radius, full height) ---
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# --- Mounting holes (10mm diameter, 80mm apart, through base) ---
+hole1 = Cylinder(5, 12).translate(( 40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# --- Subtract bore and mounting holes ---
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```

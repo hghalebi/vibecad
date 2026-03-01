@@ -1,0 +1,92 @@
+Looking at the feedback carefully, I need to re-examine the geometry. The extrusion is along Z (0→50mm), so:
+
+- **Horizontal flange**: X=0..50, Y=0..3, Z=0..50 → holes drill through **Y** (thickness), spaced along **X** at hole_inset and flange_length-hole_inset, at a fixed Z (mid-depth = 25mm)
+- **Vertical flange**: X=0..3, Y=0..50, Z=0..50 → holes drill through **X** (thickness), spaced along **Y** at hole_inset and flange_length-hole_inset, at a fixed Z (mid-depth = 25mm)
+
+```python
+from build123d import *
+
+# --- Parameters ---
+flange_length = 50      # mm, each arm of the L
+flange_width  = 50      # mm, depth of the bracket (Z direction)
+thickness     = 3       # mm, sheet metal thickness
+hole_dia      = 5       # mm, M4 clearance hole
+hole_inset    = 9       # mm, inset from free outer edge of each flange arm
+mid_depth     = flange_width / 2  # 25mm — single row of holes at mid-depth
+
+# --- 2D L-shaped profile (in XY plane) ---
+# Horizontal flange: X=0..50, Y=0..3
+# Vertical flange:   X=0..3,  Y=3..50
+pts = [
+    (0, 0),
+    (flange_length, 0),
+    (flange_length, thickness),
+    (thickness, thickness),
+    (thickness, flange_length),
+    (0, flange_length),
+    (0, 0),
+]
+
+wire = Wire.make_polygon([Vector(p[0], p[1], 0) for p in pts])
+profile = make_face(wire)
+
+# Extrude along Z axis — bracket depth (50mm)
+bracket = extrude(profile, flange_width)
+
+# =============================================================================
+# MOUNTING HOLES — 2 per flange, 4 total
+# =============================================================================
+#
+# Horizontal flange: X=0..50, Y=0..3, Z=0..50
+#   Holes pierce through Y (the 3mm thickness)
+#   X positions: hole_inset=9 and flange_length-hole_inset=41
+#   Z position: mid_depth=25 (single row centred on bracket depth)
+#   Cylinder axis = Y → Rot(90, 0, 0)
+#
+# Vertical flange: X=0..3, Y=0..50, Z=0..50
+#   Holes pierce through X (the 3mm thickness)
+#   Y positions: hole_inset=9 and flange_length-hole_inset=41
+#   Z position: mid_depth=25 (single row centred on bracket depth)
+#   Cylinder axis = X → Rot(0, -90, 0)
+
+def h_hole(x_pos):
+    """Through-hole in horizontal flange, piercing Y=0..3"""
+    return (
+        Pos(x_pos, -1, mid_depth)
+        * Rot(90, 0, 0)
+        * Cylinder(hole_dia / 2, thickness + 2,
+                   align=(Align.CENTER, Align.CENTER, Align.MIN))
+    )
+
+def v_hole(y_pos):
+    """Through-hole in vertical flange, piercing X=0..3"""
+    return (
+        Pos(-1, y_pos, mid_depth)
+        * Rot(0, -90, 0)
+        * Cylinder(hole_dia / 2, thickness + 2,
+                   align=(Align.CENTER, Align.CENTER, Align.MIN))
+    )
+
+# Horizontal flange: holes at X=9 and X=41, both at Z=25
+h_hole1 = h_hole(hole_inset)
+h_hole2 = h_hole(flange_length - hole_inset)
+
+# Vertical flange: holes at Y=9 and Y=41, both at Z=25
+v_hole1 = v_hole(hole_inset)
+v_hole2 = v_hole(flange_length - hole_inset)
+
+bracket = bracket - [h_hole1, h_hole2, v_hole1, v_hole2]
+
+# --- Inner corner fillet for stress relief ---
+# The inner vertical edge runs along Z at (X=thickness, Y=thickness)
+inner_edges = (
+    bracket.edges()
+    .filter_by(Axis.Z)
+    .filter_by_position(Axis.X, thickness - 0.01, thickness + 0.01)
+    .filter_by_position(Axis.Y, thickness - 0.01, thickness + 0.01)
+)
+
+bracket = bracket.fillet(1.5, inner_edges)
+
+OBJ = bracket
+```

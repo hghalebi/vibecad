@@ -1,0 +1,45 @@
+```python
+from build123d import *
+import math
+
+with BuildPart() as pb:
+    # Base plate: 100x30x10mm
+    Box(100, 30, 10)
+
+    # Cylindrical housing: OD=50mm (r=25), height=40mm, from base top upward
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # Trim cylinder flush with base sides (Y=±15mm)
+    # Cylinder radius=25 overhangs base half-width=15, so remove 10mm on each side
+    # Trim boxes centered at Y=±20 (just outside base edge), width=10mm
+    with Locations((0, 20, 25)):
+        Box(200, 10, 60,
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            mode=Mode.SUBTRACT)
+    with Locations((0, -20, 25)):
+        Box(200, 10, 60,
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            mode=Mode.SUBTRACT)
+
+    # Select edges at Z=5 junction and apply fillet
+    junction_edges = pb.part.edges().filter_by_position(Axis.Z, 4.8, 5.2)
+    for r in [5, 4, 3, 2, 1, 0.5]:
+        try:
+            fillet(junction_edges, radius=r)
+            break
+        except Exception:
+            continue
+
+    # Central bore: 30mm diameter through entire part
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+    # Mounting holes: 10mm diameter, 80mm apart, through base
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 22, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```

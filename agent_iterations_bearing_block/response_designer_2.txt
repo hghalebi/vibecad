@@ -1,0 +1,39 @@
+## Comparison Analysis
+
+### What Changed
+The current iteration successfully added the cylindrical housing to the base plate. The AST shows a new `housing` cylinder (radius=25mm → OD=50mm, height=40mm) positioned at Z=15mm, which was then unioned (`+`) with the base.
+
+### Visual Verification
+- ✅ **Base plate**: 100×30×10mm - correct
+- ✅ **Mounting holes**: Two 10mm diameter holes, 80mm apart (±40mm on X) - correct
+- ✅ **Housing outer diameter**: 50mm (radius=25mm) - correct
+- ✅ **Housing height**: 40mm - correct
+- ✅ **Housing position**: Centered on base, rising from the top face - correct
+- ✅ **Union operation**: Housing properly merged with base
+
+The model is **on track** and progressing correctly!
+
+---
+
+## Next Step: Add the Central Bore (30mm Diameter)
+
+The housing needs a **30mm diameter through-hole** (the bearing bore) running through the center of the cylindrical housing along the Z-axis.
+
+### Instructions for the Coding Agent:
+
+Create a cylinder to subtract from the housing as the bore:
+
+```python
+# Create the 30mm bore through the housing
+bore = Pos(0, 0, 15) * Cylinder(15, 40)  # radius=15, height=40, same position as housing
+base = base - bore
+
+OBJ = base
+```
+
+- **Radius**: 15mm (diameter = 30mm) ✅
+- **Height**: 40mm (full depth of housing) ✅  
+- **Position**: Same center as housing `Pos(0, 0, 15)` ✅
+- **Operation**: Subtraction (`-`) to cut the bore through the housing ✅
+
+This will create the bearing seat cavity. After this, the only remaining step will be adding the **5mm fillets** where the housing meets the base.

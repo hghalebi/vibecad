@@ -1,0 +1,64 @@
+## Comparison Analysis
+
+### Visual Changes (Previous → Current)
+1. **Fillet approach changed**: The previous iteration used a cone-blend approach (visible as a flared base on the cylinder in the Right view). The current iteration attempts a proper `fillet()` operation using `filter_by_position` and `filter_by(GeomType.CIRCLE)`.
+
+2. **Result**: The fillet is **NOT visible** in the current render. The junction between the cylindrical housing and the base appears as a sharp 90° edge — the fillet operation likely failed silently (the try/except caught an error and continued with no fillet applied).
+
+3. **The cone-blend from the previous iteration is gone**, which is actually a regression — the previous version at least had a visible blend, even if it was geometrically approximate.
+
+### Dimension Verification
+- ✅ Base: 100×30×10mm — correct
+- ✅ Housing: OD=50mm (r=25), H=40mm — correct  
+- ✅ Bore: 30mm diameter through housing — correct
+- ✅ Mounting holes: 10mm diameter, 80mm apart (±40mm) — correct
+- ❌ Fillet: 5mm fillet at housing-base junction — **MISSING**
+
+---
+
+## Next Step: Fix the Fillet
+
+The `filter_by_position` approach is fragile. The junction edge sits at Z=5 (top of base), but the cylinder is translated so its base is at Z=5. Use a more reliable approach — **fillet the edges on the combined solid at Z=5 that are circular and have radius ~25mm**:
+
+```python
+from build123d import *
+
+# Base plate
+base = Box(100, 30, 10)
+
+# Housing cylinder centered on base top
+housing_outer = Cylinder(25, 40).translate((0, 0, 25))
+
+# Union
+pillow_block = base + housing_outer
+
+# Fillet the circular edge where housing meets base
+# Strategy: select edges near Z=5 (top of base) with radius ~25
+# Use ShapeList filtering on edge radius
+for fillet_r in [5, 4, 3, 2, 1]:
+    try:
+        candidate_edges = [
+            e for e in pillow_block.edges()
+            if abs(e.length - 2 * math.pi * 25) < 5  # circumference of R25 circle
+            and abs(e.center().Z - 5) < 1.0           # at Z=5 (base top)
+        ]
+        if candidate_edges:
+            pillow_block = pillow_block.fillet(fillet_r, candidate_edges)
+            break
+    except Exception:
+        continue
+
+# Bore
+bore = Cylinder(15, 52).translate((0, 0, 20))
+
+# Mounting holes
+hole1 = Cylinder(5, 12).translate((40, 0, 0))
+hole2 = Cylinder(5, 12).translate((-40, 0, 0))
+
+# Subtract
+pillow_block = pillow_block - bore - hole1 - hole2
+
+OBJ = pillow_block
+```
+
+**Key insight**: Filter by edge **arc length** (circumference ≈ 2π×25 ≈ 157mm) AND Z-position at Z=5. This is much more reliable than `filter_by_position` with Z-range filtering, since the exact Z tolerance can be adjusted. Don't forget `import math` at the top.

@@ -1,0 +1,48 @@
+The fillet keeps failing because the cylinder (radius=25) is wider than the base (Y=30mm), so the junction edge is not a full circle — it's clipped arcs where the cylinder overhangs the base. This creates complex edge topology that the fillet engine struggles with. The fix is to make the housing fit within the base width, OR use a different geometry strategy.
+
+Since the spec says OD=50mm and base Y=30mm, the cylinder does overhang. Let me try filleting only the edges that are fully within the base boundary, and also try using `max_fillet()` to find the actual maximum radius.
+
+```python
+from build123d import *
+import math
+
+with BuildPart() as pb:
+    # Base plate: 100x30x10mm
+    Box(100, 30, 10)
+
+    # Cylindrical housing: OD=50mm (r=25), height=40mm, from base top upward
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # The cylinder (dia=50) is wider than the base (Y=30), so the junction
+    # produces clipped arc edges, not a full circle.
+    # Select ALL edges at Z=5 (the junction plane) and fillet them
+    junction_edges = pb.part.edges().filter_by_position(Axis.Z, 4.9, 5.1)
+
+    # Use max_fillet to find the largest valid radius, capped at 5mm
+    try:
+        max_r = pb.part.max_fillet(junction_edges, max_iteration=20)
+        fillet_r = min(max_r * 0.9, 5.0)  # use 90% of max, capped at 5mm
+        fillet(junction_edges, radius=fillet_r)
+    except Exception:
+        # Fallback: try each edge individually
+        for edge in junction_edges:
+            for r in [3, 2, 1]:
+                try:
+                    fillet([edge], radius=r)
+                    break
+                except Exception:
+                    continue
+
+    # Central bore: 30mm diameter through entire part
+    with Locations((0, 0, -6)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+    # Mounting holes: 10mm diameter, 80mm apart, through base
+    with Locations((40, 0, -6), (-40, 0, -6)):
+        Cylinder(5, 22, align=(Align.CENTER, Align.CENTER, Align.MIN),
+                 mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```

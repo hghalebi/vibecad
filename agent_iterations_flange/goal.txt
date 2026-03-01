@@ -1,0 +1,1 @@
+design an L-shaped 50x50mm angle bracket from 3mm sheet metal. Start with an L-shaped 2D sketch and extrude it to make it 3D. The angle bracket is used to stiffen a vertical and horizotal panels that are connected together by their end.  The bracket has two mounting holes on each side, suitable for mounting it to the plates. Use good industry standard practices.

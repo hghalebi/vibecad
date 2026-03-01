@@ -1,0 +1,14 @@
+I'll build this incrementally, starting with the base flange disc.
+
+**Step 1: Base flange disc**
+
+```python
+from build123d import *
+
+# Base flange: 100mm diameter, 10mm thick
+flange = Cylinder(radius=50, height=10)
+
+OBJ = flange
+```
+
+This gives us the solid circular disc. Next step will add the central hole, then the mounting holes.

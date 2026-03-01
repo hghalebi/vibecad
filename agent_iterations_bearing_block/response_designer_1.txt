@@ -1,0 +1,43 @@
+## Iteration 1 Analysis
+
+### What's Been Achieved ✅
+The basic structure is taking shape with:
+- Rectangular base (100×30×10mm)
+- Cylindrical housing in the center
+- Central bore through the housing
+- Two mounting holes at the ends
+
+### Issues Identified ❌
+
+1. **Mounting Holes Position**: Looking at the **Right view**, the mounting holes appear to be centered at Z=0 (mid-height of the base), which is correct, but they need to pass **completely through** the base (Z-axis aligned). The holes look correctly placed at X=±40mm.
+
+2. **Housing Height & Position**: The housing cylinder needs to sit **on top** of the base. The base top is at Z=+5mm (base is 10mm tall, centered at Z=0). The housing should start at Z=+5mm and extend to Z=+45mm (total 40mm height from base bottom = 40mm from Z=-5). Currently translated to Z=+15 which places the center at Z=15, meaning it spans Z=-5 to Z=35... this looks **too low** — the housing should rise 40mm **from the base bottom**, meaning its top should be at Z=+35mm from base bottom = Z=+30mm in world coords.
+
+3. **Missing Fillets**: The goal explicitly requires **5mm fillets** where the cylindrical housing meets the base. This is the most critical missing feature.
+
+4. **Sharp Corners**: No fillets anywhere — this is the next priority.
+
+### Next Step: Add Fillets at Housing-Base Junction
+
+The model needs fillets at the circular edge where the cylinder meets the top face of the base. Use build123d's `fillet()` operation:
+
+```python
+from build123d import *
+
+# [keep all existing geometry construction...]
+
+# After creating pillow_block (before bore/holes subtraction or after union):
+# Select the edges at the junction between housing and base top face
+# These are circular edges at Z = +5 (top of base)
+
+pillow_block = fillet(
+    pillow_block.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+        Axis.Z, 4.9, 5.1  # edges near Z=+5 (top of base)
+    ),
+    radius=5
+)
+
+OBJ = pillow_block
+```
+
+> **Key instruction**: Apply `fillet()` **after** the boolean union of base + housing_outer, but **before** subtracting the bore and holes. This ensures clean fillet geometry. Target the circular edge at Z≈+5mm where housing meets the base top surface.

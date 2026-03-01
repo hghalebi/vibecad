@@ -1,0 +1,60 @@
+## Comparison Analysis
+
+### Visual Differences
+The PREVIOUS and CURRENT renders are **visually identical**. The code change was purely a refactoring of the edge-selection logic for fillets (switching from `filter_by_position`/`filter_by` to a list comprehension with circumference-based filtering), plus added debug print statements. No geometric changes occurred.
+
+### Goal Verification
+The current iteration attempted to improve the fillet edge selection robustness. Looking at the renders carefully:
+
+**Right view observation**: The junction between the cylindrical housing and the base appears to have a **flat/sharp transition** - the fillet at the base of the housing does NOT appear to be applied. The housing meets the base with what looks like a flat chamfer or no fillet at all.
+
+---
+
+## Current State Assessment
+
+### ✅ What's Correct:
+- Rectangular base: 100×30×10mm ✓
+- Cylindrical housing: 50mm OD, 40mm height ✓
+- Central bore: 30mm diameter ✓
+- Two mounting holes: 10mm diameter, 80mm apart ✓
+
+### ❌ What's Missing/Wrong:
+- **5mm fillets where housing meets base** — still not visually confirmed as applied
+- The fillet selection logic keeps being refactored but the result looks unchanged
+
+---
+
+## Next Step: Fix the Fillet with Build123d's Builder API
+
+The imperative API fillet selector is unreliable here. **Switch to the Builder (Context) API** for reliable fillet application:
+
+```python
+from build123d import *
+
+with BuildPart() as pb:
+    # Base
+    Box(100, 30, 10)
+    # Housing
+    with Locations((0, 0, 5)):
+        Cylinder(25, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    # Fillet the junction edges
+    fillet(
+        pb.part.edges().filter_by(GeomType.CIRCLE).filter_by_position(
+            Axis.Z, 4.5, 5.5
+        ),
+        radius=5
+    )
+    # Bore
+    with Locations((0, 0, 5)):
+        Cylinder(15, 52, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+    # Mounting holes
+    with Locations((40, 0, 5), (-40, 0, 5)):
+        Cylinder(5, 12, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+OBJ = pb.part
+```
+
+**Key advantages:**
+- `Align.MIN` ensures cylinders grow upward from base top
+- Fillet is applied **before** subtracting bore (simpler topology)
+- Builder API manages context automatically — no manual edge hunting needed

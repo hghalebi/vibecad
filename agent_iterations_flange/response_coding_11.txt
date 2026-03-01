@@ -1,0 +1,74 @@
+Looking at this carefully, the repeated failures suggest the `Pos + Rot + Cylinder` chain isn't composing as expected. Let me use a completely different approach — placing cylinders using explicit `Location` with axis-aligned planes to guarantee correct orientation.
+
+```python
+from build123d import *
+
+# --- Parameters ---
+flange_length = 50      # mm, each arm of the L
+flange_width  = 50      # mm, depth of the bracket (Z direction)
+thickness     = 3       # mm, sheet metal thickness
+hole_dia      = 5       # mm, M4 clearance hole
+hole_inset    = 9       # mm, inset from free outer edge of each flange arm
+mid_z         = flange_width / 2  # 25mm — holes centred along bracket depth
+
+# --- 2D L-shaped profile (in XY plane) ---
+# Horizontal flange: X=0..50, Y=0..3
+# Vertical flange:   X=0..3,  Y=0..50
+pts = [
+    (0, 0),
+    (flange_length, 0),
+    (flange_length, thickness),
+    (thickness, thickness),
+    (thickness, flange_length),
+    (0, flange_length),
+    (0, 0),
+]
+
+wire = Wire.make_polygon([Vector(p[0], p[1], 0) for p in pts])
+profile = make_face(wire)
+bracket = extrude(profile, flange_width)
+
+# =============================================================================
+# MOUNTING HOLES
+# =============================================================================
+# Strategy: use Plane objects to define the drill direction unambiguously.
+#
+# Horizontal flange top face is at Y=3, normal = +Y.
+# We extrude a circle downward through the 3mm wall.
+# Use Plane with origin on the face, normal along Y.
+#
+# Vertical flange outer face is at X=3, normal = +X.
+# We extrude a circle inward through the 3mm wall.
+
+hole_r = hole_dia / 2
+drill_len = thickness + 4   # longer than wall to guarantee clean cut
+
+# --- Horizontal flange holes ---
+# Face at Y=thickness, normal +Y. Drill from Y=thickness downward (negative Y).
+# Hole centres: X=hole_inset and X=flange_length-hole_inset, Z=mid_z
+for hx in [hole_inset, flange_length - hole_inset]:
+    plane = Plane(origin=(hx, thickness, mid_z), x_dir=(1, 0, 0), z_dir=(0, 1, 0))
+    cyl = plane * Cylinder(hole_r, drill_len,
+                           align=(Align.CENTER, Align.CENTER, Align.MIN))
+    bracket = bracket - cyl
+
+# --- Vertical flange holes ---
+# Face at X=thickness, normal +X. Drill from X=thickness inward (negative X).
+# Hole centres: Y=hole_inset and Y=flange_length-hole_inset, Z=mid_z
+for hy in [hole_inset, flange_length - hole_inset]:
+    plane = Plane(origin=(thickness, hy, mid_z), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
+    cyl = plane * Cylinder(hole_r, drill_len,
+                           align=(Align.CENTER, Align.CENTER, Align.MIN))
+    bracket = bracket - cyl
+
+# --- Inner corner fillet for stress relief ---
+inner_edges = (
+    bracket.edges()
+    .filter_by(Axis.Z)
+    .filter_by_position(Axis.X, thickness - 0.01, thickness + 0.01)
+    .filter_by_position(Axis.Y, thickness - 0.01, thickness + 0.01)
+)
+bracket = bracket.fillet(1.5, inner_edges)
+
+OBJ = bracket
+```
